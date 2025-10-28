@@ -74,6 +74,8 @@
         const [thirdColor, setThirdColor] = useState('#10b981'); // green-500
         const [chordType, setChordType] = useState('triads'); // triads | sevenths
         const [selectedChord, setSelectedChord] = useState(null);
+        const [zoomLevel, setZoomLevel] = useState(1); // 1 = normal, 1.5 = 150%, 2 = 200%
+        const [startFret, setStartFret] = useState(1); // First fret to display
 
         // sound removed
 
@@ -309,6 +311,38 @@
                       {showDegrees ? 'Show Notes' : 'Show Degrees'}
                     </button>
 
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.25))}
+                        className={`h-10 w-10 grid place-items-center rounded-lg transition-colors ${
+                          darkMode
+                            ? 'bg-slate-800 hover:bg-slate-700 text-white'
+                            : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
+                        }`}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="11" cy="11" r="8"></circle>
+                          <path d="M11 8h0M11 14h0"></path>
+                        </svg>
+                      </button>
+                      <span className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-700'} min-w-[3rem] text-center`}>
+                        {Math.round(zoomLevel * 100)}%
+                      </span>
+                      <button
+                        onClick={() => setZoomLevel(Math.min(2, zoomLevel + 0.25))}
+                        className={`h-10 w-10 grid place-items-center rounded-lg transition-colors ${
+                          darkMode
+                            ? 'bg-slate-800 hover:bg-slate-700 text-white'
+                            : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
+                        }`}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="11" cy="11" r="8"></circle>
+                          <path d="M11 8h0M8 11h6M11 14h0"></path>
+                        </svg>
+                      </button>
+                    </div>
+
                     <button
                       onClick={() => setDarkMode(!darkMode)}
                       className={`h-10 w-10 grid place-items-center rounded-lg transition-colors ${
@@ -330,7 +364,7 @@
 
             <div className="container mx-auto px-4 py-8">
               <div className="overflow-x-auto">
-                <div className="inline-block min-w-full">
+                <div className="inline-block min-w-full" style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}>
                   <div className={`${darkMode ? 'bg-[#2a2a2a]' : 'bg-gray-200'} rounded-lg p-6 relative`}>
                     <div className="flex mb-2">
                       <div className="w-12"></div>
