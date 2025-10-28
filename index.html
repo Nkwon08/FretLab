@@ -74,8 +74,8 @@
         const [thirdColor, setThirdColor] = useState('#10b981'); // green-500
         const [chordType, setChordType] = useState('triads'); // triads | sevenths
         const [selectedChord, setSelectedChord] = useState(null);
-        const [zoomLevel, setZoomLevel] = useState(1); // 1 = normal, 1.5 = 150%, 2 = 200%
         const [startFret, setStartFret] = useState(1); // First fret to display
+        const [endFret, setEndFret] = useState(21); // Last fret to display
 
         // sound removed
 
@@ -311,36 +311,45 @@
                       {showDegrees ? 'Show Notes' : 'Show Degrees'}
                     </button>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.25))}
-                        className={`h-10 w-10 grid place-items-center rounded-lg transition-colors ${
-                          darkMode
-                            ? 'bg-slate-800 hover:bg-slate-700 text-white'
-                            : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
-                        }`}
-                      >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="11" cy="11" r="8"></circle>
-                          <path d="M11 8h0M11 14h0"></path>
-                        </svg>
-                      </button>
-                      <span className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-700'} min-w-[3rem] text-center`}>
-                        {Math.round(zoomLevel * 100)}%
-                      </span>
-                      <button
-                        onClick={() => setZoomLevel(Math.min(2, zoomLevel + 0.25))}
-                        className={`h-10 w-10 grid place-items-center rounded-lg transition-colors ${
-                          darkMode
-                            ? 'bg-slate-800 hover:bg-slate-700 text-white'
-                            : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
-                        }`}
-                      >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="11" cy="11" r="8"></circle>
-                          <path d="M11 8h0M8 11h6M11 14h0"></path>
-                        </svg>
-                      </button>
+                    <div className="flex flex-col gap-1">
+                      <label className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Frets
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          max="21"
+                          value={startFret}
+                          onChange={(e) => {
+                            const val = Math.max(1, Math.min(20, parseInt(e.target.value) || 1));
+                            setStartFret(val);
+                            if (val >= endFret) setEndFret(Math.min(21, val + 1));
+                          }}
+                          className={`w-16 px-2 py-1 text-sm rounded ${
+                            darkMode 
+                              ? 'bg-slate-800 text-white border-slate-600' 
+                              : 'bg-white text-slate-900 border-slate-300'
+                          } border`}
+                        />
+                        <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>-</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="21"
+                          value={endFret}
+                          onChange={(e) => {
+                            const val = Math.max(2, Math.min(21, parseInt(e.target.value) || 21));
+                            setEndFret(val);
+                            if (val <= startFret) setStartFret(Math.max(1, val - 1));
+                          }}
+                          className={`w-16 px-2 py-1 text-sm rounded ${
+                            darkMode 
+                              ? 'bg-slate-800 text-white border-slate-600' 
+                              : 'bg-white text-slate-900 border-slate-300'
+                          } border`}
+                        />
+                      </div>
                     </div>
 
                     <button
@@ -364,20 +373,24 @@
 
             <div className="container mx-auto px-4 py-8">
               <div className="overflow-x-auto">
-                <div className="inline-block min-w-full" style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}>
+                <div className="inline-block min-w-full">
                   <div className={`${darkMode ? 'bg-[#2a2a2a]' : 'bg-gray-200'} rounded-lg p-6 relative`}>
                     <div className="flex mb-2">
                       <div className="w-12"></div>
-                      {[...Array(21)].map((_, fret) => (
-                        <div
-                          key={fret}
-                          className={`flex-shrink-0 w-16 text-center text-xs font-semibold ${
-                            darkMode ? 'text-slate-400' : 'text-slate-600'
-                          }`}
-                        >
-                          {fret + 1}
-                        </div>
-                      ))}
+                      {[...Array(21)].map((_, fret) => {
+                        const fretNum = fret + 1;
+                        if (fretNum < startFret || fretNum > endFret) return null;
+                        return (
+                          <div
+                            key={fret}
+                            className={`flex-shrink-0 w-16 text-center text-xs font-semibold ${
+                              darkMode ? 'text-slate-400' : 'text-slate-600'
+                            }`}
+                          >
+                            {fretNum}
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {strings.map((string, stringIndex) => (
@@ -405,6 +418,9 @@
                             const isRoot = isRootNote(noteIndex);
                             const degree = getScaleDegree(noteIndex);
                             const isHovered = hoveredNote === `${stringIndex}-${fretNum}`;
+                            
+                            // Only show frets in the selected range
+                            if (fretNum < startFret || fretNum > endFret) return null;
 
                             return (
                               <div
