@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FretLab - Guitar Scale & Chord Explorer</title>
+    <meta name="description" content="Interactive guitar scale and chord explorer with fretboard visualization">
+    <!-- Inter font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root { --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'; }
+      html, body { font-family: var(--font-sans); }
+    </style>
+  </head>
+  <body class="antialiased">
+    <div id="root"></div>
+
+    <!-- React and ReactDOM via CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for in-browser JSX transform -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Your component code (inlined for file:// compatibility) -->
+    <script type="text/babel" data-presets="env,react">
+      /* global React */
+      const { useState, useMemo } = React;
+
+      const Sun = ({ size = 20 }) => (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="12" r="4"></circle>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+        </svg>
+      );
+
+      const Moon = ({ size = 20 }) => (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      );
+
+      const GuitarScaleExplorer = () => {
+        const [rootNote, setRootNote] = useState('C');
+        const [scaleType, setScaleType] = useState('major');
+        const [showDegrees, setShowDegrees] = useState(false);
+        const [darkMode, setDarkMode] = useState(true);
+        const [hoveredNote, setHoveredNote] = useState(null);
+        const [rootColor, setRootColor] = useState('#ef4444'); // red-500
+        const [noteColor, setNoteColor] = useState('#3b82f6'); // blue-500
+        const [thirdColor, setThirdColor] = useState('#10b981'); // green-500
+        const [chordType, setChordType] = useState('triads'); // triads | sevenths
+        const [selectedChord, setSelectedChord] = useState(null);
+
+        // sound removed
+
+        const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        
+        const strings = [
+          { name: 'E', openNote: 4 },
+          { name: 'B', openNote: 11 },
+          { name: 'G', openNote: 7 },
+          { name: 'D', openNote: 2 },
+          { name: 'A', openNote: 9 },
+          { name: 'E', openNote: 4 }
+        ];
+
+        const scales = {
+          major: [0, 2, 4, 5, 7, 9, 11],
+          minor: [0, 2, 3, 5, 7, 8, 10],
+          pentatonicMajor: [0, 2, 4, 7, 9],
+          pentatonicMinor: [0, 3, 5, 7, 10],
+          blues: [0, 3, 5, 6, 7, 10],
+          dorian: [0, 2, 3, 5, 7, 9, 10],
+          phrygian: [0, 1, 3, 5, 7, 8, 10],
+          lydian: [0, 2, 4, 6, 7, 9, 11],
+          mixolydian: [0, 2, 4, 5, 7, 9, 10],
+          locrian: [0, 1, 3, 5, 6, 8, 10],
+          harmonicMinor: [0, 2, 3, 5, 7, 8, 11],
+          melodicMinor: [0, 2, 3, 5, 7, 9, 11]
+        };
+
+        const scaleNames = {
+          major: 'Major',
+          minor: 'Natural Minor',
+          pentatonicMajor: 'Pentatonic Major',
+          pentatonicMinor: 'Pentatonic Minor',
+          blues: 'Blues',
+          dorian: 'Dorian',
+          phrygian: 'Phrygian',
+          lydian: 'Lydian',
+          mixolydian: 'Mixolydian',
+          locrian: 'Locrian',
+          harmonicMinor: 'Harmonic Minor',
+          melodicMinor: 'Melodic Minor'
+        };
+
+        const getScaleNotes = useMemo(() => {
+          const rootIndex = notes.indexOf(rootNote);
+          const intervals = scales[scaleType];
+          return intervals.map(interval => (rootIndex + interval) % 12);
+        }, [rootNote, scaleType]);
+
+        const isNoteInScale = (noteIndex) => {
+          return getScaleNotes.includes(noteIndex % 12);
+        };
+
+        const getScaleDegree = (noteIndex) => {
+          const normalizedNote = noteIndex % 12;
+          const degreeIndex = getScaleNotes.indexOf(normalizedNote);
+          return degreeIndex !== -1 ? degreeIndex + 1 : null;
+        };
+
+        const getNoteAtFret = (stringOpenNote, fret) => {
+          return (stringOpenNote + fret) % 12;
+        };
+
+        const isRootNote = (noteIndex) => {
+          return noteIndex % 12 === notes.indexOf(rootNote);
+        };
+
+        const isToneInChord = (noteIndex) => {
+          if (!selectedChord || !selectedChord.pcs) return false;
+          const normalizedNote = noteIndex % 12;
+          return selectedChord.pcs.includes(normalizedNote);
+        };
+
+        const isChordRoot = (noteIndex) => {
+          if (!selectedChord) return false;
+          return (noteIndex % 12) === selectedChord.pcs[0];
+        };
+
+        const isChordThird = (noteIndex) => {
+          if (!selectedChord || !selectedChord.pcs || selectedChord.pcs.length < 2) return false;
+          return (noteIndex % 12) === selectedChord.pcs[1];
+        };
+
+
+        // --- Chords ---
+        const rotateArray = (arr, start) => arr.slice(start).concat(arr.slice(0, start));
+        const pcDistance = (a, b) => (b - a + 12) % 12;
+        const intervalsToQualityTriad = (iv) => {
+          const sig = iv.sort((x,y)=>x-y).join(',');
+          if (sig === '0,4,7') return 'maj';
+          if (sig === '0,3,7') return 'm';
+          if (sig === '0,3,6') return 'dim';
+          if (sig === '0,4,8') return 'aug';
+          return '';
+        };
+        const intervalsToQualitySeventh = (iv) => {
+          const sig = iv.sort((x,y)=>x-y).join(',');
+          if (sig === '0,4,7,11') return 'maj7';
+          if (sig === '0,4,7,10') return '7';
+          if (sig === '0,3,7,10') return 'm7';
+          if (sig === '0,3,6,10') return 'm7b5';
+          if (sig === '0,3,6,9') return 'dim7';
+          return '7';
+        };
+        const buildDiatonicChords = useMemo(() => {
+          const scalePcs = getScaleNotes; // array of pitch classes (0-11)
+          if (!scalePcs || scalePcs.length === 0) return [];
+          const chords = [];
+          for (let degree = 0; degree < scalePcs.length; degree++) {
+            const rotated = rotateArray(scalePcs, degree);
+            const stack = chordType === 'sevenths' ? [0,2,4,6] : [0,2,4];
+            const chordPcs = stack.map(step => rotated[step % rotated.length]);
+            const rootPc = chordPcs[0];
+            const intervals = chordPcs.map(pc => pcDistance(rootPc, pc));
+            const rootName = notes[rootPc];
+            const quality = chordType === 'sevenths' ? intervalsToQualitySeventh(intervals) : intervalsToQualityTriad(intervals);
+            chords.push({
+              name: `${rootName}${quality}`,
+              degree: degree + 1,
+              pcs: chordPcs,
+              quality,
+            });
+          }
+          return chords;
+        }, [getScaleNotes, chordType]);
+
+        return (
+          <div className={`min-h-screen ${darkMode ? 'bg-[#121212]' : 'bg-gray-100'} transition-colors duration-300`}>
+            <div className={`${darkMode ? 'bg-[#1c1c1c] border-[#2c2c2c]' : 'bg-white border-gray-200'} border-b`}>
+            
+              <div className="container mx-auto px-4 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <h1 className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
+
+                    FretLab
+                  </h1>
+                  
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div className="flex flex-col">
+                      <label className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Root Note
+                      </label>
+                      <select
+                        value={rootNote}
+                        onChange={(e) => setRootNote(e.target.value)}
+                        className={`px-3 h-10 text-sm rounded-lg ${
+                          darkMode 
+                            ? 'bg-slate-800 text-white border-slate-600' 
+                            : 'bg-white text-slate-900 border-slate-300'
+                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      >
+                        {notes.map(note => (
+                          <option key={note} value={note}>{note}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <label className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Chords
+                      </label>
+                      <select
+                        value={chordType}
+                        onChange={(e) => setChordType(e.target.value)}
+                        className={`px-3 h-10 text-sm rounded-lg ${
+                          darkMode 
+                            ? 'bg-slate-800 text-white border-slate-600' 
+                            : 'bg-white text-slate-900 border-slate-300'
+                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      >
+                        <option value="triads">Triads</option>
+                        <option value="sevenths">Sevenths</option>
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <label className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Scale Type
+                      </label>
+                      <select
+                        value={scaleType}
+                        onChange={(e) => setScaleType(e.target.value)}
+                        className={`px-3 h-10 text-sm rounded-lg ${
+                          darkMode 
+                            ? 'bg-slate-800 text-white border-slate-600' 
+                            : 'bg-white text-slate-900 border-slate-300'
+                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      >
+                        {Object.entries(scaleNames).map(([key, name]) => (
+                          <option key={key} value={key}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <label className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Root Color
+                      </label>
+                      <input
+                        type="color"
+                        value={rootColor}
+                        onChange={(e) => setRootColor(e.target.value)}
+                        className={`h-10 w-16 rounded border ${darkMode ? 'border-slate-600 bg-slate-800' : 'border-slate-300 bg-white'}`}
+                        aria-label="Pick root note color"
+                      />
+                    </div>
+
+                    <div className="flex flex-col">
+                      <label className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Note Color
+                      </label>
+                      <input
+                        type="color"
+                        value={noteColor}
+                        onChange={(e) => setNoteColor(e.target.value)}
+                        className={`h-10 w-16 rounded border ${darkMode ? 'border-slate-600 bg-slate-800' : 'border-slate-300 bg-white'}`}
+                        aria-label="Pick scale note color"
+                      />
+                    </div>
+
+                    {/* sound controls removed */}
+
+                    <button
+                      onClick={() => setShowDegrees(!showDegrees)}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        darkMode
+                          ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                          : 'bg-indigo-500 hover:bg-indigo-600 text-white'
+                      }`}
+                      
+                    >
+                      {showDegrees ? 'Show Notes' : 'Show Degrees'}
+                    </button>
+
+                    <button
+                      onClick={() => setDarkMode(!darkMode)}
+                      className={`h-10 w-10 grid place-items-center rounded-lg transition-colors ${
+                        darkMode
+                          ? 'bg-slate-800 hover:bg-slate-700 text-amber-400'
+                          : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                      }`}
+                    >
+                      {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className={`mt-3 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                  Current Scale: <span className="font-semibold">{rootNote} {scaleNames[scaleType]}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="container mx-auto px-4 py-8">
+              <div className="overflow-x-auto">
+                <div className="inline-block min-w-full">
+                  <div className={`${darkMode ? 'bg-[#2a2a2a]' : 'bg-gray-200'} rounded-lg p-6 relative`}>
+                    <div className="flex mb-2">
+                      <div className="w-12"></div>
+                      {[...Array(21)].map((_, fret) => (
+                        <div
+                          key={fret}
+                          className={`flex-shrink-0 w-16 text-center text-xs font-semibold ${
+                            darkMode ? 'text-slate-400' : 'text-slate-600'
+                          }`}
+                        >
+                          {fret + 1}
+                        </div>
+                      ))}
+                    </div>
+
+                    {strings.map((string, stringIndex) => (
+                      <div key={stringIndex} className="flex items-center mb-1">
+                        <div
+                          className={`w-12 text-center font-bold ${
+                            darkMode ? 'text-slate-200' : 'text-slate-700'
+                          }`}
+                        >
+                          {string.name}
+                        </div>
+
+                        <div className="flex flex-1 relative">
+                          <div
+                            className={`absolute left-0 right-0 top-1/2 transform -translate-y-1/2 ${
+                              darkMode ? 'bg-slate-600' : 'bg-slate-400'
+                            }`}
+                            style={{ height: `${2 + stringIndex * 0.3}px` }}
+                          ></div>
+
+                          {[...Array(21)].map((_, fret) => {
+                            const fretNum = fret + 1; // Display fret number starting from 1
+                            const noteIndex = getNoteAtFret(string.openNote, fretNum);
+                            const inScale = isNoteInScale(noteIndex);
+                            const isRoot = isRootNote(noteIndex);
+                            const degree = getScaleDegree(noteIndex);
+                            const isHovered = hoveredNote === `${stringIndex}-${fretNum}`;
+
+                            return (
+                              <div
+                                key={fret}
+                                className="flex-shrink-0 w-16 h-12 flex items-center justify-center relative"
+                                onMouseEnter={() => setHoveredNote(`${stringIndex}-${fretNum}`)}
+                                onMouseLeave={() => setHoveredNote(null)}
+                              >
+                                {fret > 0 && (
+                                  <div
+                                    className={`absolute left-0 top-0 bottom-0 w-0.5 ${
+                                      darkMode ? 'bg-slate-700' : 'bg-slate-300'
+                                    }`}
+                                  ></div>
+                                )}
+
+                                {(() => {
+                                  // First check if chord is selected
+                                  if (selectedChord) {
+                                    const shouldShow = isToneInChord(noteIndex);
+                                    if (!shouldShow) return null;
+                                  } else if (!inScale) return null;
+                                  
+                                  const isChordRootNote = isChordRoot(noteIndex);
+                                  const isChordThirdNote = isChordThird(noteIndex);
+                                  const isScaleRootNote = isRootNote(noteIndex);
+                                  
+                                  let bgColor;
+                                  if (selectedChord) {
+                                    if (isChordRootNote) bgColor = rootColor;
+                                    else if (isChordThirdNote) bgColor = thirdColor;
+                                    else bgColor = noteColor;
+                                  } else {
+                                    bgColor = isScaleRootNote ? rootColor : noteColor;
+                                  }
+                                  
+                                  return (
+                                    <div
+                                      className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold cursor-default transition-all ${isHovered ? 'scale-110 shadow-lg' : 'shadow-md'}`}
+                                      style={{ 
+                                        backgroundColor: bgColor,
+                                        color: '#ffffff'
+                                      }}
+                                    >
+                                      {showDegrees ? degree : notes[noteIndex]}
+                                    </div>
+                                  );
+                                })()}
+
+                                {stringIndex === 2 && (fretNum === 3 || fretNum === 5 || fretNum === 7 || fretNum === 9 || fretNum === 15 || fretNum === 17 || fretNum === 19 || fretNum === 21) && (
+                                  <div
+                                    className={`absolute w-2 h-2 rounded-full ${
+                                      darkMode ? 'bg-slate-600' : 'bg-slate-400'
+                                    } opacity-50`}
+                                    style={{ top: '50%', transform: 'translateY(-50%)' }}
+                                  ></div>
+                                )}
+                                {stringIndex === 3 && fretNum === 12 && (
+                                  <div
+                                    className={`absolute w-2 h-2 rounded-full ${
+                                      darkMode ? 'bg-slate-600' : 'bg-slate-400'
+                                    } opacity-50`}
+                                    style={{ top: '30%', transform: 'translateY(-50%)' }}
+                                  ></div>
+                                )}
+                                {stringIndex === 2 && fretNum === 12 && (
+                                  <div
+                                    className={`absolute w-2 h-2 rounded-full ${
+                                      darkMode ? 'bg-slate-600' : 'bg-slate-400'
+                                    } opacity-50`}
+                                    style={{ top: '70%', transform: 'translateY(-50%)' }}
+                                  ></div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Chords in Scale */}
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>
+                    Chords in Scale ({chordType})
+                  </h3>
+                  {selectedChord && (
+                    <button
+                      onClick={() => setSelectedChord(null)}
+                      className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                        darkMode
+                          ? 'bg-slate-700 hover:bg-slate-600 text-white'
+                          : 'bg-slate-300 hover:bg-slate-400 text-slate-900'
+                      }`}
+                    >
+                      Clear Selection
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {buildDiatonicChords.map((ch) => (
+                    <div 
+                      key={`${ch.degree}-${ch.name}`} 
+                      className={`${darkMode ? 'bg-[#2a2a2a]' : 'bg-gray-200'} rounded-lg p-3 cursor-pointer transition-all hover:scale-105 ${
+                        selectedChord && selectedChord.name === ch.name ? 'ring-2 ring-yellow-400' : ''
+                      }`}
+                      onClick={() => setSelectedChord(ch)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium`}>
+                          {ch.degree}. {ch.name}
+                        </div>
+                        <div className="flex -space-x-1">
+                          {ch.pcs.map((pc, idx) => (
+                            <div key={idx} className="w-6 h-6 rounded-full border border-black/10 flex items-center justify-center text-[10px] font-bold"
+                              style={{ backgroundColor: idx===0 ? rootColor : noteColor, color: '#fff' }}
+                            >
+                              {notes[pc]}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        );
+      };
+
+      window.GuitarScaleExplorer = GuitarScaleExplorer;
+    </script>
+
+    <!-- Mount the component with error handling -->
+    <script type="text/babel">
+      class ErrorBoundary extends React.Component {
+        constructor(props) {
+          super(props);
+          this.state = { hasError: false, error: null };
+        }
+        static getDerivedStateFromError(error) {
+          return { hasError: true, error };
+        }
+        componentDidCatch(error, info) {
+          console.error('Render error:', error, info);
+        }
+        render() {
+          if (this.state.hasError) {
+            return (
+              <div className="min-h-screen flex items-center justify-center bg-red-50 p-6">
+                <div className="max-w-lg w-full bg-white shadow rounded-lg p-6 border border-red-200">
+                  <h2 className="text-lg font-semibold text-red-700 mb-2">Something went wrong</h2>
+                  <p className="text-sm text-red-600">{String(this.state.error)}</p>
+                  <button
+                    className="mt-4 px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700"
+                    onClick={() => window.location.reload()}
+                  >
+                    Reload
+                  </button>
+                </div>
+              </div>
+            );
+          }
+          return this.props.children;
+        }
+      }
+
+      function mountApp() {
+        try {
+          if (!window.GuitarScaleExplorer) {
+            throw new Error('Component not loaded yet.');
+          }
+          const container = document.getElementById('root');
+          if (!container) {
+            throw new Error('Root container not found.');
+          }
+          const root = ReactDOM.createRoot(container);
+          root.render(
+            <ErrorBoundary>
+              <GuitarScaleExplorer />
+            </ErrorBoundary>
+          );
+        } catch (e) {
+          console.error(e);
+          const container = document.getElementById('root');
+          if (container) {
+            container.innerHTML = `
+              <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#fff1f2;padding:24px;">
+                <div style="max-width:640px;width:100%;background:#ffffff;border:1px solid #fecaca;border-radius:12px;padding:16px;font-family:ui-sans-serif,system-ui;">
+                  <div style="font-weight:600;color:#b91c1c;margin-bottom:8px;">Failed to load the app</div>
+                  <div style="color:#991b1b;font-size:14px;">${String(e)}</div>
+                </div>
+              </div>`;
+          }
+        }
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', mountApp);
+      } else {
+        mountApp();
+      }
+    </script>
+  </body>
+  </html>
+
+
