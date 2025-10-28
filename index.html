@@ -76,6 +76,8 @@
         const [selectedChord, setSelectedChord] = useState(null);
         const [startFret, setStartFret] = useState(1); // First fret to display
         const [endFret, setEndFret] = useState(21); // Last fret to display
+        const [drawingMode, setDrawingMode] = useState(null); // 'draw' | 'erase' | null
+        const [drawings, setDrawings] = useState({}); // { 'string-fret': true }
 
         // sound removed
 
@@ -134,6 +136,25 @@
           const normalizedNote = noteIndex % 12;
           const degreeIndex = getScaleNotes.indexOf(normalizedNote);
           return degreeIndex !== -1 ? degreeIndex + 1 : null;
+        };
+
+        const formatDegree = (degree, noteIndex) => {
+          if (!degree) return null;
+          
+          // Get the interval for this degree in the current scale
+          const interval = scales[scaleType][degree - 1];
+          
+          // Check if this interval is flatted or sharped compared to major scale
+          const majorIntervals = scales.major;
+          const majorIntervalForThisPosition = majorIntervals[Math.min(degree - 1, majorIntervals.length - 1)];
+          
+          if (interval < majorIntervalForThisPosition) {
+            return `${degree}♭`;
+          } else if (interval > majorIntervalForThisPosition) {
+            return `${degree}♯`;
+          }
+          
+          return degree;
         };
 
         const getNoteAtFret = (stringOpenNote, fret) => {
@@ -385,12 +406,57 @@
               </div>
             </div>
 
-            <div className="container mx-auto px-4 py-8">
-              <div className="overflow-x-auto">
+            <div className="container mx-auto px-4 py-8 flex gap-1">
+              {/* Draw Controls Sidebar */}
+              <div className={`${darkMode ? 'bg-[#1c1c1c]' : 'bg-white'} rounded-lg p-3 h-fit w-18`}>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => setDrawingMode(drawingMode === 'draw' ? null : 'draw')}
+                    className={`px-2 py-2 rounded-lg font-medium transition-colors text-sm ${
+                      drawingMode === 'draw'
+                        ? 'bg-blue-600 text-white'
+                        : darkMode
+                        ? 'bg-slate-800 hover:bg-slate-700 text-white'
+                        : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
+                    }`}
+                    title="Draw"
+                  >
+                    ✏️
+                  </button>
+
+                  <button
+                    onClick={() => setDrawingMode(drawingMode === 'erase' ? null : 'erase')}
+                    className={`px-2 py-2 rounded-lg font-medium transition-colors text-sm ${
+                      drawingMode === 'erase'
+                        ? 'bg-red-600 text-white'
+                        : darkMode
+                        ? 'bg-slate-800 hover:bg-slate-700 text-white'
+                        : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
+                    }`}
+                    title="Erase"
+                  >
+                    🧹
+                  </button>
+
+                  <button
+                    onClick={() => setDrawings({})}
+                    className={`px-2 py-2 rounded-lg font-medium transition-colors text-sm ${
+                      darkMode
+                        ? 'bg-slate-800 hover:bg-slate-700 text-white'
+                        : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
+                    }`}
+                    title="Clear all"
+                  >
+                    🔄
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto flex-1">
                 <div className="inline-block min-w-full">
-                  <div className={`${darkMode ? 'bg-[#2a2a2a]' : 'bg-gray-200'} rounded-lg p-6 relative`}>
+                  <div className={`${darkMode ? 'bg-[#2a2a2a]' : 'bg-gray-200'} rounded-lg p-8 relative`}>
                     <div className="flex mb-2">
-                      <div className="w-12"></div>
+                      <div className="w-16"></div>
                       {[...Array(21)].map((_, fret) => {
                         const fretNum = fret + 1;
                         if (fretNum < startFret || fretNum > endFret) return null;
@@ -410,7 +476,7 @@
                     {strings.map((string, stringIndex) => (
                       <div key={stringIndex} className="flex items-center mb-1">
                         <div
-                          className={`w-12 text-center font-bold ${
+                          className={`w-14 text-center font-bold ${
                             darkMode ? 'text-slate-200' : 'text-slate-700'
                           }`}
                         >
@@ -436,12 +502,24 @@
                             // Only show frets in the selected range
                             if (fretNum < startFret || fretNum > endFret) return null;
 
+                            const drawKey = `${stringIndex}-${fretNum}`;
+                            const isDrawn = drawings[drawKey];
+                            
                             return (
-                              <div
-                                key={fret}
-                                className="flex-shrink-0 w-16 h-12 flex items-center justify-center relative"
-                                onMouseEnter={() => setHoveredNote(`${stringIndex}-${fretNum}`)}
+                            <div
+                              key={fret}
+                              className="flex-shrink-0 w-16 h-14 flex items-center justify-center relative rounded-lg"
+                                onMouseEnter={() => setHoveredNote(drawKey)}
                                 onMouseLeave={() => setHoveredNote(null)}
+                                onClick={() => {
+                                  if (drawingMode === 'draw') {
+                                    setDrawings({...drawings, [drawKey]: true});
+                                  } else if (drawingMode === 'erase') {
+                                    const newDrawings = {...drawings};
+                                    delete newDrawings[drawKey];
+                                    setDrawings(newDrawings);
+                                  }
+                                }}
                               >
                                 {fret > 0 && (
                                   <div
@@ -449,6 +527,11 @@
                                       darkMode ? 'bg-slate-700' : 'bg-slate-300'
                                     }`}
                                   ></div>
+                                )}
+
+                                {/* Drawn note overlay */}
+                                {isDrawn && (
+                                  <div className="absolute inset-0 border-4 border-yellow-400 rounded-lg pointer-events-none z-20" />
                                 )}
 
                                 {(() => {
@@ -479,7 +562,7 @@
                                         color: '#ffffff'
                                       }}
                                     >
-                                      {showDegrees ? degree : notes[noteIndex]}
+                                      {showDegrees ? formatDegree(degree, noteIndex) : notes[noteIndex]}
                                     </div>
                                   );
                                 })()}
@@ -517,8 +600,10 @@
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Chords in Scale */}
+            {/* Chords in Scale */}
+            <div className="container mx-auto px-4 py-8">
               <div className="mt-6">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>
@@ -564,7 +649,6 @@
                   ))}
                 </div>
               </div>
-
             </div>
           </div>
         );
