@@ -80,6 +80,55 @@
         const [drawings, setDrawings] = useState({}); // { 'string-fret': true }
         const [isSidebarOpen, setIsSidebarOpen] = useState(false);
         const [page, setPage] = useState('Home'); // Home | Explorer | FretBoard | Tuner | About
+        const imgVersion = useMemo(() => Date.now(), []);
+
+        // --- Metronome ---
+        const [bpm, setBpm] = useState(100);
+        const [isMetronomeOn, setIsMetronomeOn] = useState(false);
+        const metroRef = React.useRef({ audioCtx: null, intervalId: null });
+        const click = () => {
+          try {
+            const ctx = metroRef.current.audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+            metroRef.current.audioCtx = ctx;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(1000, ctx.currentTime);
+            gain.gain.setValueAtTime(0.001, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.001);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.1);
+          } catch (e) {
+            /* no-op */
+          }
+        };
+        const startMetronome = () => {
+          if (isMetronomeOn) return;
+          const ms = Math.max(60_000 / Math.max(20, Math.min(300, bpm)), 50);
+          click();
+          metroRef.current.intervalId = setInterval(click, ms);
+          setIsMetronomeOn(true);
+        };
+        const stopMetronome = () => {
+          if (metroRef.current.intervalId) clearInterval(metroRef.current.intervalId);
+          metroRef.current.intervalId = null;
+          setIsMetronomeOn(false);
+        };
+        React.useEffect(() => {
+          if (!isMetronomeOn) return;
+          if (metroRef.current.intervalId) {
+            clearInterval(metroRef.current.intervalId);
+            metroRef.current.intervalId = null;
+          }
+          const ms = Math.max(60_000 / Math.max(20, Math.min(300, bpm)), 50);
+          metroRef.current.intervalId = setInterval(click, ms);
+          return () => {
+            if (metroRef.current.intervalId) clearInterval(metroRef.current.intervalId);
+          };
+        }, [bpm, isMetronomeOn]);
+        // home image state removed (not needed)
 
         // --- Tuner state ---
         const [isTunerOn, setIsTunerOn] = useState(false);
@@ -96,7 +145,249 @@
           buf: null,
         });
 
+        // Chromatic note names
         const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+        // Tuning presets (headstock display, low->high)
+        const [tuning, setTuning] = useState('standard'); // standard | dropD | halfStepDown
+        const tuningPresets = {
+          standard: ['E', 'A', 'D', 'G', 'B', 'E'],
+          dropD: ['D', 'A', 'D', 'G', 'B', 'E'],
+          halfStepDown: ['D#', 'G#', 'C#', 'F#', 'A#', 'D#'],
+        };
+
+        // Headstock selection and confirmation logic
+        const [selectedString, setSelectedString] = useState(0); // 0 = lowest string in preset list
+        const [stringHoldStart, setStringHoldStart] = useState(null);
+        const [stringConfirmed, setStringConfirmed] = useState(false);
+        const [autoDetectString, setAutoDetectString] = useState(true);
+
+        // Helpers: note name to midi and freq
+        const noteNameToMidi = (name, octave) => {
+          const idx = noteNames.indexOf(name);
+          if (idx < 0) return null;
+          return (octave + 1) * 12 + idx; // MIDI formula
+        };
+        const midiToFreq = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
+        const buildTargetFreqs = (presetKey) => {
+          // Default octaves per string low->high for standard: E2 A2 D3 G3 B3 E4
+          const baseOctavesStandard = [2,2,3,3,3,4];
+          const names = tuningPresets[presetKey];
+          if (!names) return [];
+          // Adjust low string for dropD and halfStepDown
+          const octaves = [...baseOctavesStandard];
+          if (presetKey === 'dropD') octaves[0] = 2; // D2
+          if (presetKey === 'halfStepDown') {
+            // E2->D#2 etc., octaves unchanged
+          }
+          return names.map((n, i) => {
+            const midi = noteNameToMidi(n, octaves[i]);
+            return midi != null ? midiToFreq(midi) : null;
+          });
+        };
+        const targetFreqs = buildTargetFreqs(tuning);
+
+        // Pluck sound synth
+        const pluckRef = React.useRef({ audioCtx: null });
+        const playPluck = (freq, idx = null) => {
+          try {
+            const ctx = pluckRef.current.audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+            pluckRef.current.audioCtx = ctx;
+
+            const duration = 2.2;
+            const now = ctx.currentTime;
+
+            // Multiple oscillators with detuning for natural beating
+            const osc1 = ctx.createOscillator();
+            const osc2 = ctx.createOscillator();
+            const osc3 = ctx.createOscillator();
+            osc1.type = 'triangle';
+            osc2.type = 'triangle';
+            osc3.type = 'sine';
+            osc1.frequency.setValueAtTime(freq, now);
+            osc2.frequency.setValueAtTime(freq * 0.996, now);
+            osc3.frequency.setValueAtTime(freq * 2, now); // octave harmonic
+
+            // Realistic guitar string filtering
+            const lp1 = ctx.createBiquadFilter();
+            lp1.type = 'lowpass';
+            lp1.frequency.setValueAtTime(3000, now);
+            lp1.frequency.exponentialRampToValueAtTime(1800, now + 0.1);
+            lp1.Q.setValueAtTime(0.8, now);
+
+            // Acoustic body resonance peaks
+            const body1 = ctx.createBiquadFilter();
+            body1.type = 'peaking';
+            body1.frequency.setValueAtTime(180 + freq * 0.1, now);
+            body1.gain.setValueAtTime(8, now);
+            body1.Q.setValueAtTime(2, now);
+            const body2 = ctx.createBiquadFilter();
+            body2.type = 'peaking';
+            body2.frequency.setValueAtTime(300 + freq * 0.15, now);
+            body2.gain.setValueAtTime(6, now);
+            body2.Q.setValueAtTime(1.5, now);
+
+            // More realistic pick attack (filtered noise)
+            const attackLen = 0.08 * ctx.sampleRate;
+            const noiseBuf = ctx.createBuffer(1, attackLen, ctx.sampleRate);
+            const data = noiseBuf.getChannelData(0);
+            for (let i = 0; i < data.length; i++) {
+              const t = i / ctx.sampleRate;
+              data[i] = (Math.random() * 2 - 1) * Math.exp(-t * 60) * (1 - t / 0.08);
+            }
+            const noise = ctx.createBufferSource();
+            noise.buffer = noiseBuf;
+            const noiseGain = ctx.createGain();
+            noiseGain.gain.setValueAtTime(0.25, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+            // String damping over time
+            const damping = ctx.createGain();
+            damping.gain.setValueAtTime(1, now);
+            damping.gain.exponentialRampToValueAtTime(0.3, now + 0.5);
+            damping.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            // Master envelope (boost G/B strings louder, D string moderate)
+            const gain = ctx.createGain();
+            let baseVolume = 0.6;
+            if (idx === 3 || idx === 4) baseVolume = 1.0; // G and B strings (idx 3, 4) louder
+            else if (idx === 2) baseVolume = 0.85; // D string (idx 2) moderate boost
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.exponentialRampToValueAtTime(baseVolume, now + 0.008);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            // Subtle stereo chorus for width
+            const delay = ctx.createDelay(0.1);
+            delay.delayTime.setValueAtTime(0.008, now);
+            const feedback = ctx.createGain();
+            feedback.gain.setValueAtTime(0.12, now);
+
+            // Connect graph
+            osc1.connect(lp1);
+            osc2.connect(lp1);
+            osc3.connect(lp1);
+            noise.connect(noiseGain).connect(lp1);
+            lp1.connect(body1).connect(body2).connect(damping).connect(delay);
+            delay.connect(feedback).connect(delay);
+            body2.connect(gain);
+            delay.connect(gain);
+            gain.connect(ctx.destination);
+
+            // Start/stop
+            osc1.start(now);
+            osc2.start(now);
+            osc3.start(now);
+            noise.start(now);
+            osc1.stop(now + duration);
+            osc2.stop(now + duration);
+            osc3.stop(now + duration);
+            noise.stop(now + 0.08);
+          } catch (e) {
+            /* no-op */
+          }
+        };
+
+        // Sample-based playback (optional assets)
+        const sampleRef = React.useRef({ audioCtx: null, cache: new Map() });
+        const getStringNameAndOctave = (presetKey, idx) => {
+          const baseOctavesStandard = [2,2,3,3,3,4];
+          const names = tuningPresets[presetKey];
+          if (!names || idx < 0 || idx >= names.length) return null;
+          const octaves = [...baseOctavesStandard];
+          if (presetKey === 'dropD') octaves[0] = 2;
+          return { name: names[idx], octave: octaves[idx] };
+        };
+        const playStringSample = async (idx) => {
+          try {
+            const ctx = sampleRef.current.audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+            sampleRef.current.audioCtx = ctx;
+            const info = getStringNameAndOctave(tuning, idx);
+            if (!info) throw new Error('no note info');
+            const tuningFolderMap = { standard: 'standard', dropD: 'dropD', halfStepDown: 'halfStepDown' };
+            const folder = tuningFolderMap[tuning] || 'standard';
+            const fileBase = `assets/samples/${folder}/${encodeURIComponent(info.name + info.octave)}`;
+            const tryUrls = [`${fileBase}.mp3`, `${fileBase}.wav`];
+            let buffer = null;
+            for (const url of tryUrls) {
+              const key = url;
+              if (sampleRef.current.cache.has(key)) {
+                buffer = sampleRef.current.cache.get(key);
+                break;
+              }
+              const res = await fetch(url);
+              if (res.ok) {
+                const arr = await res.arrayBuffer();
+                buffer = await ctx.decodeAudioData(arr.slice(0));
+                sampleRef.current.cache.set(key, buffer);
+                break;
+              }
+            }
+            if (!buffer) throw new Error('sample not found');
+            const src = ctx.createBufferSource();
+            src.buffer = buffer;
+            const gain = ctx.createGain();
+            // Boost G (idx 3) and B (idx 4) strings louder, D (idx 2) moderate boost
+            let baseGain = 0.9;
+            if (idx === 3 || idx === 4) baseGain = 1.7; // G and B strings louder
+            else if (idx === 2) baseGain = 1.4; // D string moderate boost
+            gain.gain.setValueAtTime(baseGain, ctx.currentTime);
+            src.connect(gain).connect(ctx.destination);
+            src.start();
+            return true;
+          } catch (e) {
+            return false;
+          }
+        };
+        const playStringSound = async (idx) => {
+          const ok = await playStringSample(idx);
+          if (!ok) {
+            const tf = targetFreqs && targetFreqs[idx];
+            if (tf) playPluck(tf, idx);
+          }
+        };
+
+        React.useEffect(() => {
+          // Reset confirmation when tuning preset or selected string changes
+          setStringHoldStart(null);
+          setStringConfirmed(false);
+        }, [tuning, selectedString]);
+
+        React.useEffect(() => {
+          if (!isTunerOn) {
+            setStringHoldStart(null);
+            setStringConfirmed(false);
+            return;
+          }
+          // Auto-detect likely string based on nearest target frequency
+          if (autoDetectString && tunerFreq > 0 && targetFreqs && targetFreqs.length === 6) {
+            let bestIdx = selectedString;
+            let bestDiff = Infinity;
+            for (let i = 0; i < targetFreqs.length; i++) {
+              const tf = targetFreqs[i];
+              if (!tf) continue;
+              const centsDiff = 1200 * Math.log2(tunerFreq / tf);
+              const absDiff = Math.abs(centsDiff);
+              if (absDiff < bestDiff) {
+                bestDiff = absDiff;
+                bestIdx = i;
+              }
+            }
+            if (bestIdx !== selectedString) setSelectedString(bestIdx);
+          }
+          const target = tuningPresets[tuning][selectedString];
+          const inTune = target && tunerNote === target && Math.abs(tunerCents) <= 5;
+          if (inTune) {
+            if (!stringHoldStart) {
+              setStringHoldStart(performance.now());
+            } else if (!stringConfirmed && performance.now() - stringHoldStart >= 3000) {
+              setStringConfirmed(true);
+            }
+          } else {
+            setStringHoldStart(null);
+            setStringConfirmed(false);
+          }
+        }, [tunerNote, tunerCents, tunerFreq, tuning, selectedString, isTunerOn, stringHoldStart, stringConfirmed, autoDetectString, targetFreqs]);
+
         const freqToNoteInfo = (freq) => {
           if (!freq || !isFinite(freq) || freq <= 0) return null;
           const midi = Math.round(69 + 12 * Math.log2(freq / 440));
@@ -347,13 +638,14 @@
                     >
                       ☰
                     </button>
-                    <h1 className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
-                      FretLab
-                    </h1>
+                  <h1 className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
+                    FretLab
+                  </h1>
                   </div>
                   
                 {(page === 'Explorer' || page === 'FretBoard') && (
                   <div className="flex flex-wrap items-end gap-4">
+                    <div className="flex items-end gap-3">
                     <div className="flex flex-col">
                       <label className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                         Root Note
@@ -371,6 +663,25 @@
                           <option key={note} value={note}>{note}</option>
                         ))}
                       </select>
+                    </div>
+                    <div className="flex flex-col">
+                      <label className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          Scale Type
+                      </label>
+                      <select
+                          value={scaleType}
+                          onChange={(e) => setScaleType(e.target.value)}
+                        className={`px-3 h-10 text-sm rounded-lg ${
+                          darkMode 
+                            ? 'bg-slate-800 text-white border-slate-600' 
+                            : 'bg-white text-slate-900 border-slate-300'
+                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      >
+                          {Object.entries(scaleNames).map(([key, name]) => (
+                            <option key={key} value={key}>{name}</option>
+                          ))}
+                      </select>
+                      </div>
                     </div>
 
                     <div className="flex flex-col">
@@ -391,24 +702,7 @@
                       </select>
                     </div>
 
-                    <div className="flex flex-col">
-                      <label className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        Scale Type
-                      </label>
-                      <select
-                        value={scaleType}
-                        onChange={(e) => setScaleType(e.target.value)}
-                        className={`px-3 h-10 text-sm rounded-lg ${
-                          darkMode 
-                            ? 'bg-slate-800 text-white border-slate-600' 
-                            : 'bg-white text-slate-900 border-slate-300'
-                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                      >
-                        {Object.entries(scaleNames).map(([key, name]) => (
-                          <option key={key} value={key}>{name}</option>
-                        ))}
-                      </select>
-                    </div>
+                    {/* Scale Type moved next to Root Note */}
 
                     <div className="flex flex-col">
                       <label className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -503,7 +797,7 @@
                     </div>
                   </div>
                 )}
-                </div>
+                    </div>
 
                 {(page === 'Explorer' || page === 'FretBoard') && (
                   <div className={`mt-3 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -529,7 +823,7 @@
             >
               <div className="p-4 flex items-center justify-between border-b border-white/5">
                 <div className="font-semibold">Menu</div>
-                <button
+                    <button
                   onClick={() => setIsSidebarOpen(false)}
                   className={`h-8 w-8 grid place-items-center rounded ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}
                   title="Close"
@@ -556,25 +850,19 @@
                     }`}
                   >
                     {item.label}
-                  </button>
+                    </button>
                 ))}
               </nav>
-            </div>
+                </div>
 
             {/* Main Content */}
             {page === 'Home' && (
               <div className="container mx-auto px-4 py-12">
-                <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-3xl font-semibold mb-3`}>Welcome to FretLab</div>
+                <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-3xl font-semibold mb-3`}>Welcome to the FretLab</div>
                 <div className={`${darkMode ? 'text-slate-300' : 'text-slate-700'} mb-6`}>
-                  Explore scales and chords, draw on the fretboard, and tune your guitar.
+                  Hello, my younglings. Friendly reminder to practice your scales and chords.
                 </div>
-                <div className="mt-6">
-                  <img
-                    src="pic.jpeg"
-                    alt="FretLab showcase"
-                    className={`block mx-auto w-full max-w-3xl rounded-xl border ${darkMode ? 'border-white/10 shadow-xl' : 'border-black/10 shadow'} object-cover`}
-                  />
-                </div>
+                {/* image removed from Home */}
                 <div className="flex gap-3 mt-6">
                   <button onClick={() => setPage('FretBoard')} className={`${darkMode ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-indigo-500 hover:bg-indigo-600 text-white'} px-4 py-2 rounded-lg font-medium`}>
                     Open Fretboard
@@ -582,14 +870,14 @@
                   <button onClick={() => setPage('Tuner')} className={`${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-300 hover:bg-slate-400 text-slate-900'} px-4 py-2 rounded-lg font-medium`}>
                     Open Tuner
                   </button>
-                </div>
               </div>
+            </div>
             )}
 
             {(page === 'Explorer' || page === 'FretBoard') && (
             <div className="w-full px-2 py-8 flex gap-1">
               {/* Draw Controls Sidebar */}
-              <div className={`${darkMode ? 'bg-[#1c1c1c]' : 'bg-white'} rounded-lg p-3 h-fit w-18`}>
+              <div className={`${darkMode ? 'bg-[#1c1c1c]' : 'bg-white'} rounded-lg p-2 h-fit w-24`}>
                 <div className="flex flex-col gap-2">
                   <button
                     onClick={() => setDrawingMode(drawingMode === 'draw' ? null : 'draw')}
@@ -631,6 +919,31 @@
                     🔄Clear
                   </button>
                 </div>
+                <div className={`mt-2 p-2 rounded ${darkMode ? 'bg-[#111]' : 'bg-slate-100'} overflow-hidden`}>
+                  <div className={`text-xs mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Metronome</div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="20"
+                      max="300"
+                      step="1"
+                      value={bpm}
+                      inputMode="numeric"
+                      onChange={(e)=> setBpm(Math.max(20, Math.min(300, parseInt(e.target.value) || 0)))}
+                      onBlur={(e)=> setBpm(Math.max(20, Math.min(300, parseInt(e.target.value) || 100)))}
+                      className={`w-[72px] px-2 py-1 text-xs rounded ${darkMode ? 'bg-slate-800 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'} border`}
+                    />
+                    {/* BPM label removed */}
+                  </div>
+                  {/* Slider removed per request */}
+                  <div className="flex gap-2 mt-2">
+                    {!isMetronomeOn ? (
+                      <button onClick={startMetronome} className={`${darkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} px-2 py-1 rounded text-xs font-medium w-full`}>Start</button>
+                    ) : (
+                      <button onClick={stopMetronome} className={`${darkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'} px-2 py-1 rounded text-xs font-medium w-full`}>Stop</button>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="overflow-x-auto flex-1">
@@ -639,21 +952,21 @@
                     <div className="flex mb-2">
                       <div className="w-16"></div>
                       <div className="flex flex-1">
-                        {[...Array(21)].map((_, fret) => {
-                          const fretNum = fret + 1;
-                          if (fretNum < startFret || fretNum > endFret) return null;
-                          return (
-                            <div
-                              key={fret}
+                      {[...Array(21)].map((_, fret) => {
+                        const fretNum = fret + 1;
+                        if (fretNum < startFret || fretNum > endFret) return null;
+                        return (
+                          <div
+                            key={fret}
                               className={`text-center text-xs font-semibold ${
-                                darkMode ? 'text-slate-400' : 'text-slate-600'
-                              }`}
+                              darkMode ? 'text-slate-400' : 'text-slate-600'
+                            }`}
                               style={{ width: `${100 / visibleFretCount}%` }}
-                            >
-                              {fretNum}
-                            </div>
-                          );
-                        })}
+                          >
+                            {fretNum}
+                          </div>
+                        );
+                      })}
                       </div>
                     </div>
 
@@ -791,7 +1104,13 @@
             {page === 'Tuner' && (
               <div className="container mx-auto px-4 py-12">
                 <div className="flex items-center justify-between mb-6">
-                  <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-2xl font-semibold`}>Guitar Tuner</div>
+                  <div className="flex items-center gap-3">
+                    <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-2xl font-semibold`}>Guitar Tuner</div>
+                    <label className={`flex items-center gap-2 text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      <input type="checkbox" checked={autoDetectString} onChange={(e)=> setAutoDetectString(e.target.checked)} />
+                      Auto string detect
+                    </label>
+                  </div>
                   <div className="flex gap-2">
                     {!isTunerOn ? (
                       <button onClick={startTuner} className={`${darkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} px-4 py-2 rounded-lg font-medium`}>
@@ -819,6 +1138,8 @@
                         <div className="flex-1" />
                         <div className={`${darkMode ? 'text-slate-400' : 'text-slate-600'} text-xs`}>+50¢</div>
                       </div>
+                      {/* Green in-tune zone (±5¢) */}
+                      <div className="absolute left-1/2 bottom-0 -translate-x-1/2 w-8 h-24 bg-green-500/25 rounded" />
                       <div className="absolute left-1/2 bottom-0 -translate-x-1/2 w-1 h-24 bg-indigo-600 origin-bottom rounded"
                         style={{ transform: `translateX(-50%) rotate(${(tunerCents / 50) * 45}deg)` }}
                       />
@@ -828,18 +1149,94 @@
                       <div className={`${darkMode ? 'text-slate-300' : 'text-slate-700'} text-sm`}>Detected</div>
                       <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-5xl font-bold leading-tight`}>{tunerNote}</div>
                       <div className={`${darkMode ? 'text-slate-300' : 'text-slate-700'} text-sm mt-1`}>{tunerFreq ? tunerFreq.toFixed(1) + ' Hz' : '--'}</div>
-                      <div className={`mt-2 text-sm font-medium ${tunerCents === 0 ? 'text-green-500' : tunerCents < 0 ? 'text-amber-500' : 'text-amber-500'}`}>
-                        {tunerCents === 0 ? 'In tune' : tunerCents < 0 ? `${Math.abs(tunerCents)}¢ flat` : `${tunerCents}¢ sharp`}
+                      <div className={`mt-2 text-sm font-medium ${Math.abs(tunerCents) <= 5 ? 'text-green-500' : 'text-amber-500'}`}>
+                        {Math.abs(tunerCents) <= 5 ? 'In tune' : tunerCents < 0 ? `${Math.abs(tunerCents)}¢ flat` : `${tunerCents}¢ sharp`}
+                      </div>
+                      {/* Target string indicator with hold progress */}
+                      <div className="mt-4 flex flex-col items-center gap-1">
+                        <div className={`${darkMode ? 'text-slate-200' : 'text-slate-900'} text-sm font-semibold`}>
+                          Target: {tuningPresets[tuning][selectedString]}
+                        </div>
+                        <div className="w-40 h-2 rounded-full overflow-hidden border border-black/10">
+                          {(() => {
+                            const start = stringHoldStart;
+                            const progress = stringConfirmed ? 1 : (start ? Math.min(1, (performance.now() - start) / 3000) : 0);
+                            const barColor = stringConfirmed ? 'bg-green-500' : 'bg-amber-500';
+                            return <div className={`${barColor} h-full`} style={{ width: `${progress * 100}%` }} />;
+                          })()}
+                        </div>
                       </div>
                     </div>
                   </div>
+                  {/* Right column: Headstock + Tuning */}
                   <div className="space-y-3">
-                    <div className={`${darkMode ? 'text-slate-200' : 'text-slate-900'} font-semibold`}>Tips</div>
-                    <ul className={`${darkMode ? 'text-slate-300' : 'text-slate-700'} text-sm list-disc pl-5 space-y-1`}>
-                      <li>Allow microphone access when prompted.</li>
-                      <li>Pluck a single open string for best results.</li>
-                      <li>Move closer to the mic in noisy rooms.</li>
-                    </ul>
+                    <div className={`text-sm ${darkMode ? 'text-slate-200' : 'text-slate-900'} font-semibold`}>Tuning</div>
+                    <select
+                      value={tuning}
+                      onChange={(e)=> setTuning(e.target.value)}
+                      className={`w-full px-3 h-9 text-sm rounded-lg ${darkMode ? 'bg-slate-800 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'} border focus:outline-none`}
+                    >
+                      <option value="standard">Standard (E A D G B E)</option>
+                      <option value="dropD">Drop D (D A D G B E)</option>
+                      <option value="halfStepDown">Half-step Down (D# G# C# F# A# D#)</option>
+                    </select>
+
+                    <div className={`mt-2 ${darkMode ? 'bg-[#0f0f0f] border-[#2c2c2c]' : 'bg-slate-100 border-slate-300'} border rounded-lg p-3`}>
+                      <div className={`text-xs mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Headstock</div>
+                      {/* Acoustic-style headstock: 3+3 tuners */}
+                      <div className="relative w-72 h-44 mx-auto">
+                        {/* Wood headstock body */}
+                        <div className={`absolute left-1/2 -translate-x-1/2 top-2 bottom-2 w-20 rounded-[24px] ${darkMode ? 'bg-[#2a1b10]' : 'bg-amber-800'} shadow-inner`} />
+                        {/* Nut */}
+                        <div className={`${darkMode ? 'bg-slate-300' : 'bg-slate-200'} absolute left-1/2 -translate-x-1/2 bottom-2 h-1 w-24 rounded`} />
+
+                        {(() => {
+                          // 3 pegs per side (left/right), bottom to top is low->high
+                          const positions = [
+                            { idx: 0, side: 'left', top: '76%' },
+                            { idx: 1, side: 'left', top: '50%' },
+                            { idx: 2, side: 'left', top: '24%' },
+                            { idx: 3, side: 'right', top: '24%' }, // G (top)
+                            { idx: 4, side: 'right', top: '50%' }, // B (middle)
+                            { idx: 5, side: 'right', top: '76%' }, // E (bottom)
+                          ];
+
+                          return positions.map((p) => {
+                            const open = tuningPresets[tuning][p.idx];
+                            const isSelected = p.idx === selectedString;
+                            const pillClass = isSelected
+                              ? (stringConfirmed
+                                  ? 'bg-green-600 text-white border-green-600'
+                                  : 'bg-amber-500 text-white border-amber-500')
+                              : `${darkMode ? 'bg-slate-800 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`;
+                            const pegSideClass = p.side === 'left' ? 'left-3' : 'right-3';
+                            const labelSideClass = p.side === 'left' ? 'left-12' : 'right-12';
+                            const stringAnchorClass = p.side === 'left' ? 'left-[88px]' : 'right-[88px]';
+                            return (
+                              <div key={p.idx} className="absolute" style={{ top: p.top, left: 0, right: 0 }}>
+                                {/* String segment to nut */}
+                                <div className={`absolute ${stringAnchorClass} h-0.5 ${darkMode ? 'bg-slate-500' : 'bg-slate-400'} w-16`} />
+                                {/* Peg */}
+                                <div className={`absolute ${pegSideClass} -translate-y-1/2`}>
+                                  <div className={`${darkMode ? 'bg-zinc-300' : 'bg-zinc-200'} w-4 h-4 rounded-full shadow`} />
+                                </div>
+                                {/* Clickable note label */}
+                                <button
+                                  type="button"
+                                  className={`absolute ${labelSideClass} -translate-y-1/2 px-2 py-0.5 text-xs rounded-full border ${pillClass}`}
+                                  onClick={() => {
+                                    setSelectedString(p.idx);
+                                    playStringSound(p.idx);
+                                  }}
+                                >
+                                  {open}
+                                </button>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -848,58 +1245,60 @@
             
 
             {page === 'About' && (
-              <div className="container mx-auto px-4 py-12"></div>
+              <div className="container mx-auto px-4 py-12">
+                <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-2xl font-semibold mb-4`}>About</div>
+              </div>
             )}
 
             {/* Chords in Scale - hidden on Home, Tuner, and About */}
             {page !== 'Home' && page !== 'Tuner' && page !== 'About' && (
-              <div className="container mx-auto px-4 py-8">
-                <div className="mt-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>
-                      Chords in Scale ({chordType})
-                    </h3>
-                    {selectedChord && (
-                      <button
-                        onClick={() => setSelectedChord(null)}
-                        className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
-                          darkMode
-                            ? 'bg-slate-700 hover:bg-slate-600 text-white'
-                            : 'bg-slate-300 hover:bg-slate-400 text-slate-900'
-                        }`}
-                      >
-                        Clear Selection
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {buildDiatonicChords.map((ch) => (
-                      <div 
-                        key={`${ch.degree}-${ch.name}`} 
-                        className={`${darkMode ? 'bg-[#2a2a2a]' : 'bg-gray-200'} rounded-lg p-3 cursor-pointer transition-all hover:scale-105 ${
-                          selectedChord && selectedChord.name === ch.name ? 'ring-2 ring-yellow-400' : ''
-                        }`}
-                        onClick={() => setSelectedChord(ch)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium`}>
-                            {ch.degree}. {ch.name}
-                          </div>
-                          <div className="flex -space-x-1">
-                            {ch.pcs.map((pc, idx) => (
-                              <div key={idx} className="w-6 h-6 rounded-full border border-black/10 flex items-center justify-center text-[10px] font-bold"
-                                style={{ backgroundColor: idx===0 ? rootColor : noteColor, color: '#fff' }}
-                              >
-                                {notes[pc]}
-                              </div>
-                            ))}
-                          </div>
+            <div className="container mx-auto px-4 py-8">
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>
+                    Chords in Scale ({chordType})
+                  </h3>
+                  {selectedChord && (
+                    <button
+                      onClick={() => setSelectedChord(null)}
+                      className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                        darkMode
+                          ? 'bg-slate-700 hover:bg-slate-600 text-white'
+                          : 'bg-slate-300 hover:bg-slate-400 text-slate-900'
+                      }`}
+                    >
+                      Clear Selection
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {buildDiatonicChords.map((ch) => (
+                    <div 
+                      key={`${ch.degree}-${ch.name}`} 
+                      className={`${darkMode ? 'bg-[#2a2a2a]' : 'bg-gray-200'} rounded-lg p-3 cursor-pointer transition-all hover:scale-105 ${
+                        selectedChord && selectedChord.name === ch.name ? 'ring-2 ring-yellow-400' : ''
+                      }`}
+                      onClick={() => setSelectedChord(ch)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium`}>
+                          {ch.degree}. {ch.name}
+                        </div>
+                        <div className="flex -space-x-1">
+                          {ch.pcs.map((pc, idx) => (
+                            <div key={idx} className="w-6 h-6 rounded-full border border-black/10 flex items-center justify-center text-[10px] font-bold"
+                              style={{ backgroundColor: idx===0 ? rootColor : (idx===1 ? thirdColor : noteColor), color: '#fff' }}
+                            >
+                              {notes[pc]}
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
               </div>
+            </div>
             )}
           </div>
         );
