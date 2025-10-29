@@ -78,13 +78,118 @@
         const [endFret, setEndFret] = useState(21); // Last fret to display
         const [drawingMode, setDrawingMode] = useState(null); // 'draw' | 'erase' | null
         const [drawings, setDrawings] = useState({}); // { 'string-fret': true }
+        const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+        const [page, setPage] = useState('Home'); // Home | Explorer | FretBoard | Tuner | About
+
+        // --- Tuner state ---
+        const [isTunerOn, setIsTunerOn] = useState(false);
+        const [tunerFreq, setTunerFreq] = useState(0);
+        const [tunerNote, setTunerNote] = useState('-');
+        const [tunerCents, setTunerCents] = useState(0);
+        const [tunerError, setTunerError] = useState(null);
+        const tunerRef = React.useRef({
+          audioCtx: null,
+          analyser: null,
+          source: null,
+          stream: null,
+          rafId: null,
+          buf: null,
+        });
+
+        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const freqToNoteInfo = (freq) => {
+          if (!freq || !isFinite(freq) || freq <= 0) return null;
+          const midi = Math.round(69 + 12 * Math.log2(freq / 440));
+          const name = noteNames[(midi + 1200) % 12];
+          const noteFreq = 440 * Math.pow(2, (midi - 69) / 12);
+          const cents = Math.round(1200 * Math.log2(freq / noteFreq));
+          return { name, freq: noteFreq, cents, midi };
+        };
+
+        const autoCorrelate = (buf, sampleRate) => {
+          // Autocorrelation-based pitch detection
+          const SIZE = buf.length;
+          let rms = 0;
+          for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
+          rms = Math.sqrt(rms / SIZE);
+          if (rms < 0.01) return -1; // too low signal
+
+          let r1 = 0, r2 = SIZE - 1, thres = 0.2;
+          for (let i = 0; i < SIZE / 2; i++) if (Math.abs(buf[i]) < thres) { r1 = i; break; }
+          for (let i = 1; i < SIZE / 2; i++) if (Math.abs(buf[SIZE - i]) < thres) { r2 = SIZE - i; break; }
+          buf = buf.slice(r1, r2);
+          const newSize = buf.length;
+          const c = new Array(newSize).fill(0);
+          for (let i = 0; i < newSize; i++) {
+            for (let j = 0; j < newSize - i; j++) c[i] = c[i] + buf[j] * buf[j + i];
+          }
+          let d = 0; while (c[d] > c[d + 1]) d++;
+          let maxval = -1, maxpos = -1;
+          for (let i = d; i < newSize; i++) {
+            if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
+          }
+          let T0 = maxpos;
+          if (T0 > 0 && T0 < newSize - 1) {
+            const x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
+            const a = (x1 + x3 - 2 * x2) / 2;
+            const b = (x3 - x1) / 2;
+            if (a) T0 = T0 - b / (2 * a);
+          }
+          const freq = sampleRate / T0;
+          return freq;
+        };
+
+        const startTuner = async () => {
+          try {
+            setTunerError(null);
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+            const source = audioCtx.createMediaStreamSource(stream);
+            const analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 2048;
+            source.connect(analyser);
+            const buf = new Float32Array(analyser.fftSize);
+            tunerRef.current = { audioCtx, analyser, source, stream, rafId: null, buf };
+
+            const tick = () => {
+              analyser.getFloatTimeDomainData(buf);
+              const freq = autoCorrelate(buf, audioCtx.sampleRate);
+              if (freq > 0 && isFinite(freq) && freq < 2000) {
+                setTunerFreq(freq);
+                const info = freqToNoteInfo(freq);
+                if (info) {
+                  setTunerNote(info.name);
+                  setTunerCents(Math.max(-50, Math.min(50, info.cents)));
+                }
+              }
+              tunerRef.current.rafId = requestAnimationFrame(tick);
+            };
+            setIsTunerOn(true);
+            tick();
+          } catch (e) {
+            setTunerError(String(e && e.message ? e.message : e));
+            setIsTunerOn(false);
+          }
+        };
+
+        const stopTuner = () => {
+          const ref = tunerRef.current;
+          if (ref.rafId) cancelAnimationFrame(ref.rafId);
+          if (ref.stream) ref.stream.getTracks().forEach(t => t.stop());
+          if (ref.audioCtx) ref.audioCtx.close();
+          tunerRef.current = { audioCtx: null, analyser: null, source: null, stream: null, rafId: null, buf: null };
+          setIsTunerOn(false);
+          setTunerFreq(0);
+          setTunerNote('-');
+          setTunerCents(0);
+        };
 
         // sound removed
 
         const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
         
         const strings = [
-          { name: 'E', openNote: 4 },
+          { name: 'e', openNote: 4 },
           { name: 'B', openNote: 11 },
           { name: 'G', openNote: 7 },
           { name: 'D', openNote: 2 },
@@ -224,17 +329,30 @@
           return chords;
         }, [getScaleNotes, chordType]);
 
+        const visibleFretCount = Math.max(1, endFret - startFret + 1);
+
         return (
           <div className={`min-h-screen ${darkMode ? 'bg-[#121212]' : 'bg-gray-100'} transition-colors duration-300`}>
             <div className={`${darkMode ? 'bg-[#1c1c1c] border-[#2c2c2c]' : 'bg-white border-gray-200'} border-b`}>
             
               <div className="container mx-auto px-4 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
-                  <h1 className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
-
-                    FretLab
-                  </h1>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setIsSidebarOpen(true)}
+                      className={`h-10 w-10 grid place-items-center rounded-lg transition-colors ${
+                        darkMode ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
+                      }`}
+                      title="Open Menu"
+                    >
+                      ☰
+                    </button>
+                    <h1 className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
+                      FretLab
+                    </h1>
+                  </div>
                   
+                {(page === 'Explorer' || page === 'FretBoard') && (
                   <div className="flex flex-wrap items-end gap-4">
                     <div className="flex flex-col">
                       <label className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -318,8 +436,6 @@
                       />
                     </div>
 
-                    {/* sound controls removed */}
-
                     <button
                       onClick={() => setShowDegrees(!showDegrees)}
                       className={`px-4 py-2 rounded-lg font-medium transition-colors ${
@@ -327,7 +443,6 @@
                           ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
                           : 'bg-indigo-500 hover:bg-indigo-600 text-white'
                       }`}
-                      
                     >
                       {showDegrees ? 'Show Notes' : 'Show Degrees'}
                     </button>
@@ -386,27 +501,93 @@
                         </button>
                       </div>
                     </div>
-
-                    <button
-                      onClick={() => setDarkMode(!darkMode)}
-                      className={`h-10 w-10 grid place-items-center rounded-lg transition-colors ${
-                        darkMode
-                          ? 'bg-slate-800 hover:bg-slate-700 text-amber-400'
-                          : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
-                      }`}
-                    >
-                      {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-                    </button>
                   </div>
+                )}
                 </div>
 
-                <div className={`mt-3 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Current Scale: <span className="font-semibold">{rootNote} {scaleNames[scaleType]}</span>
-                </div>
+                {(page === 'Explorer' || page === 'FretBoard') && (
+                  <div className={`mt-3 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                    Current Scale: <span className="font-semibold">{rootNote} {scaleNames[scaleType]}</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="container mx-auto px-4 py-8 flex gap-1">
+            {/* Sidebar Overlay */}
+            {isSidebarOpen && (
+              <div
+                className="fixed inset-0 bg-black/50 z-40"
+                onClick={() => setIsSidebarOpen(false)}
+              />
+            )}
+
+            {/* Sidebar Panel */}
+            <div
+              className={`fixed top-0 left-0 h-full w-64 z-50 transform transition-transform duration-300 ${
+                isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+              } ${darkMode ? 'bg-[#1c1c1c] border-r border-[#2c2c2c] text-white' : 'bg-white border-r border-gray-200 text-slate-900'}`}
+            >
+              <div className="p-4 flex items-center justify-between border-b border-white/5">
+                <div className="font-semibold">Menu</div>
+                <button
+                  onClick={() => setIsSidebarOpen(false)}
+                  className={`h-8 w-8 grid place-items-center rounded ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}
+                  title="Close"
+                >
+                  ✕
+                </button>
+              </div>
+              <nav className="p-2">
+                {[
+                  { key: 'Home', label: 'Home' },
+                  { key: 'FretBoard', label: 'Fretboard' },
+                  { key: 'Tuner', label: 'Tuner' },
+                  { key: 'About', label: 'About' },
+                ].map(item => (
+                  <button
+                    key={item.key}
+                    onClick={() => { setPage(item.key); setIsSidebarOpen(false); }}
+                    className={`w-full text-left px-3 py-2 rounded mb-1 font-medium transition-colors ${
+                      page === item.key
+                        ? 'bg-indigo-600 text-white'
+                        : darkMode
+                        ? 'hover:bg-slate-800 text-slate-200'
+                        : 'hover:bg-slate-100 text-slate-800'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            {/* Main Content */}
+            {page === 'Home' && (
+              <div className="container mx-auto px-4 py-12">
+                <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-3xl font-semibold mb-3`}>Welcome to FretLab</div>
+                <div className={`${darkMode ? 'text-slate-300' : 'text-slate-700'} mb-6`}>
+                  Explore scales and chords, draw on the fretboard, and tune your guitar.
+                </div>
+                <div className="mt-6">
+                  <img
+                    src="pic.jpeg"
+                    alt="FretLab showcase"
+                    className={`block mx-auto w-full max-w-3xl rounded-xl border ${darkMode ? 'border-white/10 shadow-xl' : 'border-black/10 shadow'} object-cover`}
+                  />
+                </div>
+                <div className="flex gap-3 mt-6">
+                  <button onClick={() => setPage('FretBoard')} className={`${darkMode ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-indigo-500 hover:bg-indigo-600 text-white'} px-4 py-2 rounded-lg font-medium`}>
+                    Open Fretboard
+                  </button>
+                  <button onClick={() => setPage('Tuner')} className={`${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-300 hover:bg-slate-400 text-slate-900'} px-4 py-2 rounded-lg font-medium`}>
+                    Open Tuner
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {(page === 'Explorer' || page === 'FretBoard') && (
+            <div className="w-full px-2 py-8 flex gap-1">
               {/* Draw Controls Sidebar */}
               <div className={`${darkMode ? 'bg-[#1c1c1c]' : 'bg-white'} rounded-lg p-3 h-fit w-18`}>
                 <div className="flex flex-col gap-2">
@@ -421,7 +602,7 @@
                     }`}
                     title="Draw"
                   >
-                    ✏️
+                    ✏️Draw
                   </button>
 
                   <button
@@ -435,7 +616,7 @@
                     }`}
                     title="Erase"
                   >
-                    🧹
+                    🧹Erase
                   </button>
 
                   <button
@@ -447,30 +628,33 @@
                     }`}
                     title="Clear all"
                   >
-                    🔄
+                    🔄Clear
                   </button>
                 </div>
               </div>
 
               <div className="overflow-x-auto flex-1">
-                <div className="inline-block min-w-full">
+                <div className="block w-full">
                   <div className={`${darkMode ? 'bg-[#2a2a2a]' : 'bg-gray-200'} rounded-lg p-8 relative`}>
                     <div className="flex mb-2">
                       <div className="w-16"></div>
-                      {[...Array(21)].map((_, fret) => {
-                        const fretNum = fret + 1;
-                        if (fretNum < startFret || fretNum > endFret) return null;
-                        return (
-                          <div
-                            key={fret}
-                            className={`flex-shrink-0 w-16 text-center text-xs font-semibold ${
-                              darkMode ? 'text-slate-400' : 'text-slate-600'
-                            }`}
-                          >
-                            {fretNum}
-                          </div>
-                        );
-                      })}
+                      <div className="flex flex-1">
+                        {[...Array(21)].map((_, fret) => {
+                          const fretNum = fret + 1;
+                          if (fretNum < startFret || fretNum > endFret) return null;
+                          return (
+                            <div
+                              key={fret}
+                              className={`text-center text-xs font-semibold ${
+                                darkMode ? 'text-slate-400' : 'text-slate-600'
+                              }`}
+                              style={{ width: `${100 / visibleFretCount}%` }}
+                            >
+                              {fretNum}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     {strings.map((string, stringIndex) => (
@@ -508,7 +692,8 @@
                             return (
                             <div
                               key={fret}
-                              className="flex-shrink-0 w-16 h-14 flex items-center justify-center relative rounded-lg"
+                              className="h-14 flex items-center justify-center relative rounded-lg"
+                                style={{ width: `${100 / visibleFretCount}%` }}
                                 onMouseEnter={() => setHoveredNote(drawKey)}
                                 onMouseLeave={() => setHoveredNote(null)}
                                 onClick={() => {
@@ -601,55 +786,121 @@
                 </div>
               </div>
             </div>
+            )}
 
-            {/* Chords in Scale */}
-            <div className="container mx-auto px-4 py-8">
-              <div className="mt-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>
-                    Chords in Scale ({chordType})
-                  </h3>
-                  {selectedChord && (
-                    <button
-                      onClick={() => setSelectedChord(null)}
-                      className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
-                        darkMode
-                          ? 'bg-slate-700 hover:bg-slate-600 text-white'
-                          : 'bg-slate-300 hover:bg-slate-400 text-slate-900'
-                      }`}
-                    >
-                      Clear Selection
-                    </button>
-                  )}
+            {page === 'Tuner' && (
+              <div className="container mx-auto px-4 py-12">
+                <div className="flex items-center justify-between mb-6">
+                  <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-2xl font-semibold`}>Guitar Tuner</div>
+                  <div className="flex gap-2">
+                    {!isTunerOn ? (
+                      <button onClick={startTuner} className={`${darkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} px-4 py-2 rounded-lg font-medium`}>
+                        Start
+                      </button>
+                    ) : (
+                      <button onClick={stopTuner} className={`${darkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'} px-4 py-2 rounded-lg font-medium`}>
+                        Stop
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {buildDiatonicChords.map((ch) => (
-                    <div 
-                      key={`${ch.degree}-${ch.name}`} 
-                      className={`${darkMode ? 'bg-[#2a2a2a]' : 'bg-gray-200'} rounded-lg p-3 cursor-pointer transition-all hover:scale-105 ${
-                        selectedChord && selectedChord.name === ch.name ? 'ring-2 ring-yellow-400' : ''
-                      }`}
-                      onClick={() => setSelectedChord(ch)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium`}>
-                          {ch.degree}. {ch.name}
-                        </div>
-                        <div className="flex -space-x-1">
-                          {ch.pcs.map((pc, idx) => (
-                            <div key={idx} className="w-6 h-6 rounded-full border border-black/10 flex items-center justify-center text-[10px] font-bold"
-                              style={{ backgroundColor: idx===0 ? rootColor : noteColor, color: '#fff' }}
-                            >
-                              {notes[pc]}
-                            </div>
-                          ))}
-                        </div>
+
+                {tunerError && (
+                  <div className={`${darkMode ? 'bg-red-900/40 text-red-200 border-red-700' : 'bg-red-100 text-red-800 border-red-300'} border rounded p-3 mb-4`}>
+                    Microphone error: {tunerError}
+                  </div>
+                )}
+
+                <div className={`${darkMode ? 'bg-[#1c1c1c]' : 'bg-white'} rounded-xl border ${darkMode ? 'border-[#2c2c2c]' : 'border-gray-200'} p-6 grid grid-cols-1 md:grid-cols-3 gap-6`}>
+                  <div className="md:col-span-2 flex flex-col items-center justify-center">
+                    <div className="relative w-64 h-32">
+                      <div className="absolute inset-0 flex items-end justify-center">
+                        <div className={`${darkMode ? 'text-slate-400' : 'text-slate-600'} text-xs`}>-50¢</div>
+                        <div className="flex-1" />
+                        <div className={`${darkMode ? 'text-slate-400' : 'text-slate-600'} text-xs`}>+50¢</div>
+                      </div>
+                      <div className="absolute left-1/2 bottom-0 -translate-x-1/2 w-1 h-24 bg-indigo-600 origin-bottom rounded"
+                        style={{ transform: `translateX(-50%) rotate(${(tunerCents / 50) * 45}deg)` }}
+                      />
+                      <div className="absolute left-0 right-0 bottom-0 h-1.5 ${darkMode ? 'bg-slate-700' : 'bg-slate-300'} rounded" />
+                    </div>
+                    <div className="mt-6 text-center">
+                      <div className={`${darkMode ? 'text-slate-300' : 'text-slate-700'} text-sm`}>Detected</div>
+                      <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-5xl font-bold leading-tight`}>{tunerNote}</div>
+                      <div className={`${darkMode ? 'text-slate-300' : 'text-slate-700'} text-sm mt-1`}>{tunerFreq ? tunerFreq.toFixed(1) + ' Hz' : '--'}</div>
+                      <div className={`mt-2 text-sm font-medium ${tunerCents === 0 ? 'text-green-500' : tunerCents < 0 ? 'text-amber-500' : 'text-amber-500'}`}>
+                        {tunerCents === 0 ? 'In tune' : tunerCents < 0 ? `${Math.abs(tunerCents)}¢ flat` : `${tunerCents}¢ sharp`}
                       </div>
                     </div>
-                  ))}
+                  </div>
+                  <div className="space-y-3">
+                    <div className={`${darkMode ? 'text-slate-200' : 'text-slate-900'} font-semibold`}>Tips</div>
+                    <ul className={`${darkMode ? 'text-slate-300' : 'text-slate-700'} text-sm list-disc pl-5 space-y-1`}>
+                      <li>Allow microphone access when prompted.</li>
+                      <li>Pluck a single open string for best results.</li>
+                      <li>Move closer to the mic in noisy rooms.</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            
+
+            {page === 'About' && (
+              <div className="container mx-auto px-4 py-12"></div>
+            )}
+
+            {/* Chords in Scale - hidden on Home, Tuner, and About */}
+            {page !== 'Home' && page !== 'Tuner' && page !== 'About' && (
+              <div className="container mx-auto px-4 py-8">
+                <div className="mt-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>
+                      Chords in Scale ({chordType})
+                    </h3>
+                    {selectedChord && (
+                      <button
+                        onClick={() => setSelectedChord(null)}
+                        className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                          darkMode
+                            ? 'bg-slate-700 hover:bg-slate-600 text-white'
+                            : 'bg-slate-300 hover:bg-slate-400 text-slate-900'
+                        }`}
+                      >
+                        Clear Selection
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {buildDiatonicChords.map((ch) => (
+                      <div 
+                        key={`${ch.degree}-${ch.name}`} 
+                        className={`${darkMode ? 'bg-[#2a2a2a]' : 'bg-gray-200'} rounded-lg p-3 cursor-pointer transition-all hover:scale-105 ${
+                          selectedChord && selectedChord.name === ch.name ? 'ring-2 ring-yellow-400' : ''
+                        }`}
+                        onClick={() => setSelectedChord(ch)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium`}>
+                            {ch.degree}. {ch.name}
+                          </div>
+                          <div className="flex -space-x-1">
+                            {ch.pcs.map((pc, idx) => (
+                              <div key={idx} className="w-6 h-6 rounded-full border border-black/10 flex items-center justify-center text-[10px] font-bold"
+                                style={{ backgroundColor: idx===0 ? rootColor : noteColor, color: '#fff' }}
+                              >
+                                {notes[pc]}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
       };
