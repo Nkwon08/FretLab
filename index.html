@@ -79,12 +79,13 @@
         const [drawingMode, setDrawingMode] = useState(null); // 'draw' | 'erase' | null
         const [drawings, setDrawings] = useState({}); // { 'string-fret': true }
         const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-        const [page, setPage] = useState('Home'); // Home | Explorer | FretBoard | Tuner | About
+        const [page, setPage] = useState('Home'); // Home | Explorer | FretBoard | Tuner | About | Jam Mode
         const imgVersion = useMemo(() => Date.now(), []);
 
         // --- Metronome ---
         const [bpm, setBpm] = useState(100);
         const [isMetronomeOn, setIsMetronomeOn] = useState(false);
+        const [isMetronomeEnabled, setIsMetronomeEnabled] = useState(false); // Jam Mode enable toggle
         const metroRef = React.useRef({ audioCtx: null, intervalId: null });
         const click = () => {
           try {
@@ -161,6 +162,1118 @@
         const [stringHoldStart, setStringHoldStart] = useState(null);
         const [stringConfirmed, setStringConfirmed] = useState(false);
         const [autoDetectString, setAutoDetectString] = useState(true);
+
+        // --- Jam Mode ---
+        const [isRecording, setIsRecording] = useState(false);
+        const [recordedAudio, setRecordedAudio] = useState(null);
+        const [isPlaying, setIsPlaying] = useState(false);
+        const [isLooping, setIsLooping] = useState(false);
+        const [selectedProgression, setSelectedProgression] = useState(null); // index into chordProgressions
+        const [audioDuration, setAudioDuration] = useState(0);
+        const [cropStart, setCropStart] = useState(0);
+        const [cropEnd, setCropEnd] = useState(0);
+        const [isCropping, setIsCropping] = useState(false);
+        const [originalAudio, setOriginalAudio] = useState(null); // Store original before trimming for reset
+        const [undoStack, setUndoStack] = useState([]); // Stack of states for undo: [{audio, audioBuffer, cropStart, cropEnd, duration}]
+        const [selectedKey, setSelectedKey] = useState('C');
+        const [countdown, setCountdown] = useState(null);
+        const [isCountdownActive, setIsCountdownActive] = useState(false);
+        const [showCropUI, setShowCropUI] = useState(false);
+        const [savedLoops, setSavedLoops] = useState([]); // [{id, name, createdAt, bpm, key, progressionName}]
+        const [playbackTime, setPlaybackTime] = useState(0); // Current playback position for waveform indicator
+        const idbRef = React.useRef({ db: null });
+        const jamModeRef = React.useRef({
+          mediaRecorder: null,
+          audioChunks: [],
+          audioContext: null,
+          audioBuffer: null,
+          sourceNode: null,
+          loopTimeout: null,
+          shouldLoop: false,
+          audioElement: null,
+          countdownInterval: null,
+          metronomeStartedByRecording: false,
+          countdownTimeouts: [],
+        });
+
+        const waveformRef = React.useRef({
+          canvas: null,
+          ctx: null,
+          dragging: null, // 'start' | 'end' | 'move' | null
+          dragOffset: 0, // Offset for moving entire selection
+          pixelsPerSecond: 100,
+          currentCropStart: null, // Current drag value for start
+          currentCropEnd: null, // Current drag value for end
+        });
+
+        const musicalKeys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+        // Roman numeral progressions; case indicates chord quality (upper = major, lower = minor), 'vii°' diminished
+        const chordProgressions = [
+          { name: 'I-V-vi-IV (Pop)', romans: ['I', 'V', 'vi', 'IV'] },
+          { name: 'I-vi-IV-V (50s)', romans: ['I', 'vi', 'IV', 'V'] },
+          { name: 'vi-IV-I-V', romans: ['vi', 'IV', 'I', 'V'] },
+          { name: 'I-V-IV-I', romans: ['I', 'V', 'IV', 'I'] },
+          { name: 'ii-V-I', romans: ['ii', 'V', 'I'] },
+          { name: 'Custom', romans: [] },
+        ];
+
+        const scaleNotesMajor = (root) => {
+          const all = musicalKeys; // enharmonic simplification
+          const idx = all.indexOf(root);
+          if (idx < 0) return [];
+          const majorSteps = [0, 2, 4, 5, 7, 9, 11];
+          return majorSteps.map(semi => all[(idx + Math.round(semi/1)) % all.length]);
+        };
+
+        const romanToChordInKey = (key, roman) => {
+          const scale = scaleNotesMajor(key);
+          if (!scale.length) return '';
+          const map = { 'I':0,'ii':1,'II':1,'iii':2,'III':2,'IV':3,'iv':3,'V':4,'v':4,'vi':5,'VI':5,'vii':6,'VII':6 };
+          const deg = map[roman.replace('°','')] ?? 0;
+          const note = scale[deg];
+          const isDim = roman.includes('vii') || roman.includes('°');
+          const isMinor = roman === roman.toLowerCase() && !isDim;
+          if (isDim) return note + 'dim';
+          if (isMinor) return note + 'm';
+          return note;
+        };
+
+        const chordsForProgression = (key, romans) => romans.map(r => romanToChordInKey(key, r));
+
+        const playCountdownClick = () => {
+          try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(800, ctx.currentTime);
+            gain.gain.setValueAtTime(0.001, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.001);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.15);
+          } catch (e) {
+            /* no-op */
+          }
+        };
+
+        const startCountdown = async () => {
+          // Clear any prior countdown timers
+          if (jamModeRef.current.countdownInterval) {
+            clearInterval(jamModeRef.current.countdownInterval);
+            jamModeRef.current.countdownInterval = null;
+          }
+          if (jamModeRef.current.countdownTimeouts && jamModeRef.current.countdownTimeouts.length) {
+            jamModeRef.current.countdownTimeouts.forEach(t => clearTimeout(t));
+            jamModeRef.current.countdownTimeouts = [];
+          }
+
+          // Prepare mic and recorder before countdown to avoid permission/creation latency
+          const ok = await prepareRecorder();
+          if (!ok) return;
+
+          const bpmValue = Math.max(20, Math.min(300, bpm));
+          const beatInterval = 60000 / bpmValue; // ms per beat
+          // Compensate for MediaRecorder.start() latency (~50-100ms)
+          const recordingOffset = Math.min(80, beatInterval * 0.1); // Cap at 80ms or 10% of beat interval
+
+          setIsCountdownActive(true);
+          setCountdown(1); // show big 1
+          playCountdownClick(); // beat 1 click
+
+          const timeouts = [];
+          // Schedule beats 2, 3, 4
+          [2,3,4].forEach((num, idx) => {
+            timeouts.push(setTimeout(() => {
+              setCountdown(num);
+              playCountdownClick();
+            }, (idx + 1) * beatInterval));
+          });
+          // Start recording slightly before beat 5 to compensate for MediaRecorder.start() latency
+          // This ensures audio actually starts capturing at the right time
+          timeouts.push(setTimeout(() => {
+            setIsCountdownActive(false);
+            setCountdown(null);
+            startPreparedRecording();
+          }, 4 * beatInterval - recordingOffset));
+
+          jamModeRef.current.countdownTimeouts = timeouts;
+        };
+
+        // Prepare MediaRecorder before countdown to eliminate start latency
+        const prepareRecorder = async () => {
+          try {
+            // If currently recording, don't re-prepare
+            if (jamModeRef.current.mediaRecorder && jamModeRef.current.mediaRecorder.state === 'recording') return true;
+            // Note: We can't reuse MediaRecorder after stream is closed, so we always create new one
+            // But we prepare it early to minimize latency
+
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            const audioChunks = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+              if (event.data.size > 0) {
+                jamModeRef.current.audioChunks.push(event.data);
+              }
+            };
+
+            const streamRef = stream; // Capture stream for onstop
+            mediaRecorder.onstop = () => {
+              const audioBlob = new Blob(jamModeRef.current.audioChunks, { type: 'audio/webm' });
+              setRecordedAudio(audioBlob);
+              setOriginalAudio(audioBlob); // Store as original for reset
+              setIsRecording(false);
+              // Reset trim to full audio for new recording, but keep edit UI open
+              jamModeRef.current.audioBuffer = null; // Force reload waveform
+              setCropStart(0);
+              // Clear undo history for new recording
+              setUndoStack([]);
+              // Don't reset originalAudio - keep it so user can reset if needed
+              // stop all tracks
+              streamRef.getTracks().forEach(track => track.stop());
+              
+              // Load audio to get duration
+              const audio = new Audio(URL.createObjectURL(audioBlob));
+              audio.addEventListener('loadedmetadata', () => {
+                setAudioDuration(audio.duration);
+                setCropEnd(audio.duration);
+                audio.remove();
+              });
+            };
+
+            jamModeRef.current.mediaRecorder = mediaRecorder;
+            jamModeRef.current.audioChunks = audioChunks;
+            return true;
+          } catch (e) {
+            console.error('Error preparing recorder:', e);
+            alert('Error accessing microphone. Please allow microphone access.');
+            setIsCountdownActive(false);
+            setCountdown(null);
+            return false;
+          }
+        };
+
+        const startPreparedRecording = async () => {
+          let mr = jamModeRef.current.mediaRecorder;
+          if (!mr || mr.state !== 'inactive') {
+            const ok = await prepareRecorder();
+            if (!ok) return;
+            mr = jamModeRef.current.mediaRecorder;
+          }
+          // Reset chunks array for new recording
+          if (mr && mr.state === 'inactive') {
+            jamModeRef.current.audioChunks = [];
+          }
+          try {
+            mr.start();
+            setIsRecording(true);
+            // Start metronome only if enabled and not already running
+            if (isMetronomeEnabled && !isMetronomeOn) {
+              startMetronome();
+              jamModeRef.current.metronomeStartedByRecording = true;
+            }
+          } catch (e) {
+            console.error('Failed to start MediaRecorder, retrying with fresh recorder:', e);
+            // Try once more with a fresh recorder
+            jamModeRef.current.mediaRecorder = null;
+            const ok = await prepareRecorder();
+            if (!ok) return;
+            mr = jamModeRef.current.mediaRecorder;
+            try {
+              mr.start();
+              setIsRecording(true);
+              if (isMetronomeEnabled && !isMetronomeOn) {
+                startMetronome();
+                jamModeRef.current.metronomeStartedByRecording = true;
+              }
+            } catch (err) {
+              console.error('Second attempt to start MediaRecorder failed:', err);
+            }
+          }
+        };
+
+        const startRecording = async () => {
+          if (isRecording || isCountdownActive) return;
+          // Start preparing recorder immediately for minimal latency
+          prepareRecorder();
+          startCountdown();
+        };
+
+        const undoTrim = async () => {
+          if (undoStack.length === 0) return;
+          
+          // Stop any playback
+          if (isPlaying) stopPlayback();
+          
+          // Pop the last state from undo stack
+          const stateToRestore = undoStack[undoStack.length - 1];
+          setUndoStack(prev => prev.slice(0, -1)); // Remove last item
+          
+          // Restore the state
+          setRecordedAudio(stateToRestore.audio);
+          
+          // Restore audio buffer if available, otherwise decode
+          if (stateToRestore.audioBuffer) {
+            jamModeRef.current.audioBuffer = stateToRestore.audioBuffer;
+            setAudioDuration(stateToRestore.duration);
+            setCropStart(stateToRestore.cropStart);
+            setCropEnd(stateToRestore.cropEnd);
+            
+            // Redraw waveform
+            setTimeout(() => drawWaveform(), 50);
+          } else {
+            // Need to decode the audio
+            const audioUrl = URL.createObjectURL(stateToRestore.audio);
+            const audio = new Audio(audioUrl);
+            audio.addEventListener('loadedmetadata', async () => {
+              setAudioDuration(stateToRestore.duration || audio.duration);
+              setCropStart(stateToRestore.cropStart || 0);
+              setCropEnd(stateToRestore.cropEnd || (stateToRestore.duration || audio.duration));
+              audio.remove();
+              
+              // Reload waveform buffer
+              try {
+                const resp = await fetch(audioUrl);
+                const arr = await resp.arrayBuffer();
+                const ac = new (window.AudioContext || window.webkitAudioContext)();
+                const decoded = await ac.decodeAudioData(arr);
+                jamModeRef.current.audioBuffer = decoded;
+                ac.close();
+                URL.revokeObjectURL(audioUrl);
+                
+                // Redraw waveform
+                setTimeout(() => drawWaveform(), 50);
+              } catch (e) {
+                console.error('Failed to reload waveform:', e);
+                URL.revokeObjectURL(audioUrl);
+              }
+            });
+          }
+        };
+
+        const stopRecording = () => {
+          // Cancel countdown if active
+          if (isCountdownActive) {
+            if (jamModeRef.current.countdownInterval) {
+              clearInterval(jamModeRef.current.countdownInterval);
+              jamModeRef.current.countdownInterval = null;
+            }
+            if (jamModeRef.current.countdownTimeouts && jamModeRef.current.countdownTimeouts.length) {
+              jamModeRef.current.countdownTimeouts.forEach(t => clearTimeout(t));
+              jamModeRef.current.countdownTimeouts = [];
+            }
+            setIsCountdownActive(false);
+            setCountdown(null);
+            return;
+          }
+          
+          // Stop actual recording or release prepared stream if any
+          const mr = jamModeRef.current.mediaRecorder;
+          if (mr) {
+            if (mr.state !== 'inactive') {
+              mr.stop();
+            } else {
+              // If prepared but not started, close tracks
+              try {
+                const tracks = mr.stream ? mr.stream.getTracks() : [];
+                tracks.forEach(t => t.stop());
+              } catch {}
+              jamModeRef.current.mediaRecorder = null;
+            }
+          }
+          if (jamModeRef.current.metronomeStartedByRecording && isMetronomeOn) {
+            stopMetronome();
+            jamModeRef.current.metronomeStartedByRecording = false;
+          }
+        };
+
+        const playRecordedAudio = () => {
+          if (!recordedAudio) return;
+          if (!jamModeRef.current.shouldLoop && isPlaying) return; // Prevent duplicate playback when not looping
+          
+          jamModeRef.current.shouldLoop = isLooping;
+          
+          const audioUrl = URL.createObjectURL(recordedAudio);
+          const audio = new Audio(audioUrl);
+          
+          // Update playback time for waveform indicator
+          audio.addEventListener('timeupdate', () => {
+            setPlaybackTime(audio.currentTime);
+          });
+          
+          audio.onended = () => {
+            setPlaybackTime(0); // Reset indicator
+            URL.revokeObjectURL(audioUrl);
+            if (jamModeRef.current.shouldLoop && jamModeRef.current.sourceNode === audio) {
+              // Loop immediately - no delay
+              jamModeRef.current.sourceNode = null;
+              if (jamModeRef.current.shouldLoop) {
+                // Start next loop immediately
+                playRecordedAudio();
+              } else {
+                setIsPlaying(false);
+              }
+            } else {
+              setIsPlaying(false);
+              jamModeRef.current.sourceNode = null;
+            }
+          };
+          
+          audio.onerror = () => {
+            setPlaybackTime(0);
+            URL.revokeObjectURL(audioUrl);
+            setIsPlaying(false);
+            jamModeRef.current.sourceNode = null;
+          };
+          
+          audio.play().catch(e => {
+            console.error('Playback error:', e);
+            setPlaybackTime(0);
+            setIsPlaying(false);
+            jamModeRef.current.sourceNode = null;
+          });
+          
+          jamModeRef.current.sourceNode = audio;
+          setIsPlaying(true);
+        };
+
+        const stopPlayback = () => {
+          jamModeRef.current.shouldLoop = false;
+          if (jamModeRef.current.loopTimeout) {
+            clearTimeout(jamModeRef.current.loopTimeout);
+            jamModeRef.current.loopTimeout = null;
+          }
+          if (jamModeRef.current.sourceNode) {
+            jamModeRef.current.sourceNode.pause();
+            jamModeRef.current.sourceNode.currentTime = 0;
+            jamModeRef.current.sourceNode.onended = null; // Prevent onended from firing
+            jamModeRef.current.sourceNode = null;
+          }
+          setPlaybackTime(0); // Reset indicator
+          setIsPlaying(false);
+          setIsLooping(false);
+        };
+
+        // IndexedDB helpers for saving loops in-browser
+        const openDb = () => new Promise((resolve, reject) => {
+          if (idbRef.current.db) return resolve(idbRef.current.db);
+          const req = indexedDB.open('fretlab', 1);
+          req.onupgradeneeded = (e) => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains('loops')) {
+              const store = db.createObjectStore('loops', { keyPath: 'id', autoIncrement: true });
+              store.createIndex('createdAt', 'createdAt');
+            }
+          };
+          req.onsuccess = () => { idbRef.current.db = req.result; resolve(req.result); };
+          req.onerror = () => reject(req.error);
+        });
+
+        const listLoops = async () => {
+          const db = await openDb();
+          return new Promise((resolve, reject) => {
+            const tx = db.transaction('loops', 'readonly');
+            const store = tx.objectStore('loops');
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result.sort((a,b)=>b.createdAt - a.createdAt));
+            req.onerror = () => reject(req.error);
+          });
+        };
+
+        const saveLoopToDb = async (name) => {
+          if (!recordedAudio) return null;
+          const db = await openDb();
+          const meta = {
+            name: name || `Loop ${new Date().toLocaleString()}`,
+            createdAt: Date.now(),
+            bpm,
+            key: selectedKey,
+            progressionName: selectedProgression !== null ? chordProgressions[selectedProgression].name : null,
+            blob: recordedAudio,
+          };
+          return new Promise((resolve, reject) => {
+            const tx = db.transaction('loops', 'readwrite');
+            const store = tx.objectStore('loops');
+            const req = store.add(meta);
+            req.onsuccess = async () => { setSavedLoops(await listLoops()); resolve(req.result); };
+            req.onerror = () => reject(req.error);
+          });
+        };
+
+        const deleteLoop = async (id) => {
+          const db = await openDb();
+          return new Promise((resolve, reject) => {
+            const tx = db.transaction('loops', 'readwrite');
+            const store = tx.objectStore('loops');
+            const req = store.delete(id);
+            req.onsuccess = async () => { setSavedLoops(await listLoops()); resolve(); };
+            req.onerror = () => reject(req.error);
+          });
+        };
+
+        const loadLoop = async (id) => {
+          const db = await openDb();
+          return new Promise((resolve, reject) => {
+            const tx = db.transaction('loops', 'readonly');
+            const store = tx.objectStore('loops');
+            const req = store.get(id);
+            req.onsuccess = async () => {
+              const item = req.result;
+              if (!item) return resolve(null);
+              setRecordedAudio(item.blob);
+              setOriginalAudio(item.blob); // Set as original
+              setUndoStack([]); // Clear undo history
+              // Re-decode for waveform
+              jamModeRef.current.audioBuffer = null;
+              setAudioDuration(0);
+              setCropStart(0);
+              setCropEnd(0);
+              setTimeout(async () => {
+                try {
+                  await ensureWaveformBuffer();
+                  drawWaveform();
+                } catch {}
+              }, 0);
+              resolve(item);
+            };
+            req.onerror = () => reject(req.error);
+          });
+        };
+
+        React.useEffect(() => {
+          (async () => {
+            try {
+              await openDb();
+              setSavedLoops(await listLoops());
+            } catch {}
+          })();
+        }, []);
+
+        const cropAudio = async () => {
+          if (!recordedAudio || audioDuration === 0) return;
+          
+          const startTime = Math.max(0, Math.min(cropStart, audioDuration - 0.1));
+          const endTime = Math.min(audioDuration, Math.max(cropEnd, startTime + 0.1));
+          
+          if (endTime <= startTime) {
+            alert('End time must be greater than start time');
+            return;
+          }
+
+          setIsCropping(true);
+          try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const audioUrl = URL.createObjectURL(recordedAudio);
+            const response = await fetch(audioUrl);
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            
+            const sampleRate = audioBuffer.sampleRate;
+            const startSample = Math.floor(startTime * sampleRate);
+            const endSample = Math.floor(endTime * sampleRate);
+            const length = endSample - startSample;
+            
+            // Create new audio buffer with cropped portion
+            const croppedBuffer = audioContext.createBuffer(
+              audioBuffer.numberOfChannels,
+              length,
+              sampleRate
+            );
+            
+            for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+              const oldData = audioBuffer.getChannelData(channel);
+              const newData = croppedBuffer.getChannelData(channel);
+              for (let i = 0; i < length; i++) {
+                newData[i] = oldData[startSample + i];
+              }
+            }
+            
+            // Convert back to WAV blob
+            const wav = audioBufferToWav(croppedBuffer);
+            const croppedBlob = new Blob([wav], { type: 'audio/wav' });
+
+            // Stop any active playback before updating to new cropped version
+            if (isPlaying) {
+              stopPlayback();
+            }
+            
+            // Store original before trimming if not already stored
+            if (!originalAudio) {
+              setOriginalAudio(recordedAudio);
+            }
+            
+            // Push current state to undo stack before applying trim
+            setUndoStack(prev => [...prev, {
+              audio: recordedAudio,
+              audioBuffer: jamModeRef.current.audioBuffer ? jamModeRef.current.audioBuffer : null,
+              cropStart,
+              cropEnd,
+              duration: audioDuration
+            }]);
+            
+            // Update state and in-memory buffer so the waveform itself is trimmed
+            setRecordedAudio(croppedBlob);
+            jamModeRef.current.audioBuffer = croppedBuffer;
+            const newDuration = endTime - startTime;
+            setAudioDuration(newDuration);
+            setCropStart(0);
+            setCropEnd(newDuration);
+            // Clear any previous audio source nodes
+            if (jamModeRef.current.sourceNode) {
+              try {
+                jamModeRef.current.sourceNode.pause();
+                jamModeRef.current.sourceNode = null;
+              } catch {}
+            }
+            // Redraw waveform to reflect new buffer size
+            setTimeout(() => { try { drawWaveform(); } catch (_) {} }, 0);
+
+            URL.revokeObjectURL(audioUrl);
+            audioContext.close();
+          } catch (e) {
+            console.error('Error cropping audio:', e);
+            alert('Error cropping audio. Please try again.');
+          } finally {
+            setIsCropping(false);
+          }
+        };
+
+        // Waveform rendering and drag-to-trim
+        const drawWaveform = () => {
+          const canvas = document.getElementById('waveform-canvas');
+          if (!canvas || !jamModeRef.current.audioBuffer) return;
+          const ctx = canvas.getContext('2d');
+          const { width, height } = canvas;
+          const mid = Math.floor(height / 2);
+          ctx.clearRect(0, 0, width, height);
+
+          // Background
+          ctx.fillStyle = darkMode ? '#0f172a' : '#f1f5f9';
+          ctx.fillRect(0, 0, width, height);
+
+          // Center line
+          ctx.strokeStyle = darkMode ? '#334155' : '#94a3b8';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(0, mid);
+          ctx.lineTo(width, mid);
+          ctx.stroke();
+
+          const buffer = jamModeRef.current.audioBuffer;
+          const channelData = buffer.getChannelData(0);
+          const samplesPerPixel = Math.max(1, Math.floor(channelData.length / width));
+
+          // Waveform
+          ctx.strokeStyle = darkMode ? '#38bdf8' : '#0ea5e9';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          for (let x = 0; x < width; x++) {
+            const start = x * samplesPerPixel;
+            let min = 1.0, max = -1.0;
+            for (let i = 0; i < samplesPerPixel; i++) {
+              const s = channelData[start + i] || 0;
+              if (s < min) min = s;
+              if (s > max) max = s;
+            }
+            const y1 = mid + min * (height / 2 - 4);
+            const y2 = mid + max * (height / 2 - 4);
+            ctx.moveTo(x, y1);
+            ctx.lineTo(x, y2);
+          }
+          ctx.stroke();
+
+          // Dim areas that will be cut (outside selection) - use refs for current drag values
+          const currentStart = waveformRef.current.currentCropStart ?? cropStart;
+          const currentEnd = waveformRef.current.currentCropEnd ?? cropEnd;
+          const toX = (sec) => Math.round((sec / audioDuration) * width);
+          const selX1 = toX(Math.max(0, Math.min(audioDuration, currentStart)));
+          const selX2 = toX(Math.max(0, Math.min(audioDuration, currentEnd)));
+          
+          // Dim left side (will be cut)
+          ctx.fillStyle = darkMode ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.15)';
+          ctx.fillRect(0, 0, selX1, height);
+          // Dim right side (will be cut)
+          ctx.fillRect(selX2, 0, width - selX2, height);
+          
+          // Highlight selection area (will be kept)
+          ctx.fillStyle = darkMode ? 'rgba(34,197,94,0.25)' : 'rgba(34,197,94,0.2)';
+          ctx.fillRect(selX1, 0, Math.max(2, selX2 - selX1), height);
+          
+          // Border around selection
+          ctx.strokeStyle = darkMode ? '#22c55e' : '#16a34a';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(selX1, 0, Math.max(2, selX2 - selX1), height);
+
+          // Handles - larger and more visible
+          const handleWidth = 8;
+          const handleHitWidth = 20; // Larger hit area for easier grabbing
+          ctx.fillStyle = darkMode ? '#22c55e' : '#16a34a';
+          // Left handle
+          ctx.fillRect(selX1 - handleWidth / 2, 0, handleWidth, height);
+          // Handle grip lines for visual feedback
+          ctx.strokeStyle = darkMode ? '#16a34a' : '#15803d';
+          ctx.lineWidth = 2;
+          for (let i = 0; i < 3; i++) {
+            const yPos = (height / 4) * (i + 1);
+            ctx.beginPath();
+            ctx.moveTo(selX1 - handleWidth / 2 + 2, yPos);
+            ctx.lineTo(selX1 + handleWidth / 2 - 2, yPos);
+            ctx.stroke();
+          }
+          // Right handle
+          ctx.fillStyle = darkMode ? '#22c55e' : '#16a34a';
+          ctx.fillRect(selX2 - handleWidth / 2, 0, handleWidth, height);
+          ctx.strokeStyle = darkMode ? '#16a34a' : '#15803d';
+          for (let i = 0; i < 3; i++) {
+            const yPos = (height / 4) * (i + 1);
+            ctx.beginPath();
+            ctx.moveTo(selX2 - handleWidth / 2 + 2, yPos);
+            ctx.lineTo(selX2 + handleWidth / 2 - 2, yPos);
+            ctx.stroke();
+          }
+        };
+
+        const ensureWaveformBuffer = async () => {
+          if (!recordedAudio || jamModeRef.current.audioBuffer) return;
+          const audioUrl = URL.createObjectURL(recordedAudio);
+          try {
+            const resp = await fetch(audioUrl);
+            const arr = await resp.arrayBuffer();
+            const ac = new (window.AudioContext || window.webkitAudioContext)();
+            const decoded = await ac.decodeAudioData(arr);
+            jamModeRef.current.audioBuffer = decoded;
+            if (!audioDuration || audioDuration === 0) {
+              setAudioDuration(decoded.duration);
+              setCropEnd(decoded.duration);
+            }
+          } catch (e) {
+            console.error('Waveform decode failed', e);
+          } finally {
+            URL.revokeObjectURL(audioUrl);
+          }
+        };
+
+        React.useEffect(() => {
+          if (!showCropUI || !recordedAudio) return;
+          let down = false;
+          let rafId = null;
+          const canvas = document.getElementById('waveform-canvas');
+          if (!canvas) return;
+          
+          // Local drawWaveform that uses current state values
+          const drawWaveformLocal = () => {
+            if (!canvas || !jamModeRef.current.audioBuffer) return;
+            const ctx = canvas.getContext('2d');
+            const { width, height } = canvas;
+            const mid = Math.floor(height / 2);
+            ctx.clearRect(0, 0, width, height);
+
+            // Background
+            ctx.fillStyle = darkMode ? '#0f172a' : '#f1f5f9';
+            ctx.fillRect(0, 0, width, height);
+
+            // Center line
+            ctx.strokeStyle = darkMode ? '#334155' : '#94a3b8';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, mid);
+            ctx.lineTo(width, mid);
+            ctx.stroke();
+
+            const buffer = jamModeRef.current.audioBuffer;
+            const channelData = buffer.getChannelData(0);
+            const samplesPerPixel = Math.max(1, Math.floor(channelData.length / width));
+
+            // Waveform
+            ctx.strokeStyle = darkMode ? '#38bdf8' : '#0ea5e9';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = 0; x < width; x++) {
+              const start = x * samplesPerPixel;
+              let min = 1.0, max = -1.0;
+              for (let i = 0; i < samplesPerPixel; i++) {
+                const s = channelData[start + i] || 0;
+                if (s < min) min = s;
+                if (s > max) max = s;
+              }
+              const y1 = mid + min * (height / 2 - 4);
+              const y2 = mid + max * (height / 2 - 4);
+              ctx.moveTo(x, y1);
+              ctx.lineTo(x, y2);
+            }
+            ctx.stroke();
+
+            // Get current crop values - use refs for immediate updates during drag
+            const currentStart = waveformRef.current.currentCropStart ?? cropStart;
+            const currentEnd = waveformRef.current.currentCropEnd ?? cropEnd;
+            const currentDuration = audioDuration;
+
+            // Dim areas that will be cut (outside selection)
+            const toX = (sec) => Math.round((sec / currentDuration) * width);
+            const selX1 = toX(Math.max(0, Math.min(currentDuration, currentStart)));
+            const selX2 = toX(Math.max(0, Math.min(currentDuration, currentEnd)));
+            
+            // Dim left side (will be cut)
+            ctx.fillStyle = darkMode ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.15)';
+            ctx.fillRect(0, 0, selX1, height);
+            // Dim right side (will be cut)
+            ctx.fillRect(selX2, 0, width - selX2, height);
+            
+            // Highlight selection area (will be kept)
+            ctx.fillStyle = darkMode ? 'rgba(34,197,94,0.25)' : 'rgba(34,197,94,0.2)';
+            ctx.fillRect(selX1, 0, Math.max(2, selX2 - selX1), height);
+            
+            // Border around selection
+            ctx.strokeStyle = darkMode ? '#22c55e' : '#16a34a';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(selX1, 0, Math.max(2, selX2 - selX1), height);
+
+            // Progress bar - black vertical indicator showing playback position
+            if (isPlaying && playbackTime > 0 && currentDuration > 0) {
+              const playbackX = toX(playbackTime);
+              
+              // Draw black vertical progress bar
+              ctx.fillStyle = '#000000'; // Black color
+              ctx.fillRect(playbackX - 2, 0, 4, height); // 4px wide vertical bar
+              
+              // Optional: Add a small triangle or circle at the top for better visibility
+              ctx.fillStyle = '#000000';
+              ctx.beginPath();
+              ctx.moveTo(playbackX - 6, 0);
+              ctx.lineTo(playbackX + 6, 0);
+              ctx.lineTo(playbackX, 12);
+              ctx.closePath();
+              ctx.fill();
+            }
+
+            // Handles - larger and more visible
+            const handleWidth = 8;
+            ctx.fillStyle = darkMode ? '#22c55e' : '#16a34a';
+            // Left handle
+            ctx.fillRect(selX1 - handleWidth / 2, 0, handleWidth, height);
+            // Handle grip lines for visual feedback
+            ctx.strokeStyle = darkMode ? '#16a34a' : '#15803d';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 3; i++) {
+              const yPos = (height / 4) * (i + 1);
+              ctx.beginPath();
+              ctx.moveTo(selX1 - handleWidth / 2 + 2, yPos);
+              ctx.lineTo(selX1 + handleWidth / 2 - 2, yPos);
+              ctx.stroke();
+            }
+            // Right handle
+            ctx.fillStyle = darkMode ? '#22c55e' : '#16a34a';
+            ctx.fillRect(selX2 - handleWidth / 2, 0, handleWidth, height);
+            ctx.strokeStyle = darkMode ? '#16a34a' : '#15803d';
+            for (let i = 0; i < 3; i++) {
+              const yPos = (height / 4) * (i + 1);
+              ctx.beginPath();
+              ctx.moveTo(selX2 - handleWidth / 2 + 2, yPos);
+              ctx.lineTo(selX2 + handleWidth / 2 - 2, yPos);
+              ctx.stroke();
+            }
+          };
+          
+          const onResize = () => {
+            if (canvas) drawWaveformLocal();
+          };
+          const getSecFromX = (clientX) => {
+            const rect = canvas.getBoundingClientRect();
+            const relX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+            const sec = (relX / rect.width) * (audioDuration || 1);
+            return Math.max(0, Math.min(audioDuration || 1, sec));
+          };
+          
+          const onDown = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const x = clientX - rect.left;
+            const width = rect.width;
+            const startX = (cropStart / (audioDuration || 1)) * width;
+            const endX = (cropEnd / (audioDuration || 1)) * width;
+            const handleHitWidth = 30; // Large hit area for easy grabbing
+            
+            // Determine what we're dragging
+            const distToStart = Math.abs(x - startX);
+            const distToEnd = Math.abs(x - endX);
+            const isNearStart = distToStart < handleHitWidth;
+            const isNearEnd = distToEnd < handleHitWidth;
+            const isInSelection = x >= startX && x <= endX && !isNearStart && !isNearEnd;
+            
+            if (isNearStart && distToStart <= distToEnd) {
+              // Dragging start handle
+              waveformRef.current.dragging = 'start';
+              waveformRef.current.dragStartX = x;
+            } else if (isNearEnd) {
+              // Dragging end handle
+              waveformRef.current.dragging = 'end';
+              waveformRef.current.dragStartX = x;
+            } else if (isInSelection) {
+              // Dragging entire selection
+              waveformRef.current.dragging = 'move';
+              waveformRef.current.dragStartX = x;
+              waveformRef.current.dragOffset = x - startX;
+            } else {
+              // Clicked outside - snap nearest handle to click position
+              const clickSec = getSecFromX(clientX);
+              if (x < startX) {
+                // Click before start
+                waveformRef.current.dragging = 'start';
+                waveformRef.current.dragStartX = x;
+                const newStart = Math.max(0, Math.min(clickSec, cropEnd - 0.05));
+                setCropStart(newStart);
+                waveformRef.current.currentCropStart = newStart;
+              } else {
+                // Click after end
+                waveformRef.current.dragging = 'end';
+                waveformRef.current.dragStartX = x;
+                const newEnd = Math.min(audioDuration, Math.max(clickSec, cropStart + 0.05));
+                setCropEnd(newEnd);
+                waveformRef.current.currentCropEnd = newEnd;
+              }
+            }
+            down = true;
+            canvas.setPointerCapture?.(e.pointerId || 0); // Capture pointer for smooth dragging
+          };
+          
+          const onMove = (e) => {
+            if (!down || !waveformRef.current.dragging) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const x = clientX - rect.left;
+            const width = rect.width;
+            const sec = getSecFromX(clientX);
+            
+            if (waveformRef.current.dragging === 'start') {
+              const newStart = Math.max(0, Math.min(sec, cropEnd - 0.05));
+              waveformRef.current.currentCropStart = newStart;
+              setCropStart(newStart);
+            } else if (waveformRef.current.dragging === 'end') {
+              const newEnd = Math.min(audioDuration, Math.max(sec, cropStart + 0.05));
+              waveformRef.current.currentCropEnd = newEnd;
+              setCropEnd(newEnd);
+            } else if (waveformRef.current.dragging === 'move') {
+              // Move entire selection while maintaining width
+              const selectionWidth = cropEnd - cropStart;
+              const offsetInSec = (waveformRef.current.dragOffset / width) * audioDuration;
+              const newStart = Math.max(0, Math.min(sec - offsetInSec, audioDuration - selectionWidth));
+              const newEnd = Math.min(audioDuration, newStart + selectionWidth);
+              waveformRef.current.currentCropStart = newStart;
+              waveformRef.current.currentCropEnd = newEnd;
+              setCropStart(newStart);
+              setCropEnd(newEnd);
+            }
+            
+            // Continuous redraw for smooth dragging
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(() => {
+              drawWaveformLocal();
+              rafId = null;
+            });
+          };
+          const onUp = (e) => {
+            down = false;
+            if (rafId) {
+              cancelAnimationFrame(rafId);
+              rafId = null;
+            }
+            canvas.releasePointerCapture?.(e.pointerId || 0);
+            waveformRef.current.dragging = null;
+            waveformRef.current.dragStartX = null;
+            waveformRef.current.dragOffset = null;
+            // Clear refs so we use state values after drag
+            waveformRef.current.currentCropStart = null;
+            waveformRef.current.currentCropEnd = null;
+            drawWaveformLocal(); // Final redraw with state values
+          };
+
+          // Set up canvas for smooth interaction
+          canvas.style.userSelect = 'none';
+          canvas.style.touchAction = 'none';
+          canvas.style.cursor = 'pointer';
+          
+          (async () => {
+            await ensureWaveformBuffer();
+            // Initialize refs to current state
+            waveformRef.current.currentCropStart = cropStart;
+            waveformRef.current.currentCropEnd = cropEnd;
+            drawWaveformLocal();
+          })();
+
+          const onHover = (e) => {
+            if (!canvas || down) return; // Don't change cursor while dragging
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const width = rect.width;
+            const startX = (cropStart / (audioDuration || 1)) * width;
+            const endX = (cropEnd / (audioDuration || 1)) * width;
+            const handleHitWidth = 25;
+            
+            const distToStart = Math.abs(x - startX);
+            const distToEnd = Math.abs(x - endX);
+            
+            if (distToStart < handleHitWidth || distToEnd < handleHitWidth) {
+              canvas.style.cursor = 'ew-resize'; // Resize cursor for handles
+            } else if (x >= startX && x <= endX) {
+              canvas.style.cursor = 'grab'; // Grab cursor for selection area
+            } else {
+              canvas.style.cursor = 'pointer'; // Pointer for clicking to set trim points
+            }
+          };
+
+          window.addEventListener('resize', onResize);
+          
+          // Pointer move handler (for both hover and drag)
+          const pointerMoveHandler = (e) => {
+            if (!down) {
+              onHover(e);
+            } else {
+              onMove(e);
+            }
+          };
+          
+          // Mouse move handler (for both hover and drag)
+          const mouseMoveHandler = (e) => {
+            if (!down) {
+              onHover(e);
+            } else {
+              onMove(e);
+            }
+          };
+          
+          // Use pointer events for better cross-device support
+          canvas.addEventListener('pointerdown', onDown);
+          canvas.addEventListener('pointermove', pointerMoveHandler);
+          window.addEventListener('pointerup', onUp);
+          window.addEventListener('pointercancel', onUp);
+          // Fallback for older browsers
+          canvas.addEventListener('mousedown', onDown);
+          canvas.addEventListener('mousemove', mouseMoveHandler);
+          window.addEventListener('mouseup', onUp);
+          // Touch events for mobile
+          canvas.addEventListener('touchstart', onDown, { passive: false });
+          canvas.addEventListener('touchmove', onMove, { passive: false });
+          window.addEventListener('touchend', onUp);
+          window.addEventListener('touchcancel', onUp);
+          return () => {
+            if (canvas) canvas.style.cursor = 'default';
+            if (rafId) cancelAnimationFrame(rafId);
+            window.removeEventListener('resize', onResize);
+            // Pointer events
+            canvas.removeEventListener('pointerdown', onDown);
+            canvas.removeEventListener('pointermove', pointerMoveHandler);
+            window.removeEventListener('pointerup', onUp);
+            window.removeEventListener('pointercancel', onUp);
+            // Mouse events (fallback)
+            canvas.removeEventListener('mousedown', onDown);
+            canvas.removeEventListener('mousemove', mouseMoveHandler);
+            window.removeEventListener('mouseup', onUp);
+            // Touch events
+            canvas.removeEventListener('touchstart', onDown);
+            canvas.removeEventListener('touchmove', onMove);
+            window.removeEventListener('touchend', onUp);
+            window.removeEventListener('touchcancel', onUp);
+          };
+        }, [showCropUI, recordedAudio, cropStart, cropEnd, audioDuration, darkMode, isPlaying, playbackTime]);
+
+        React.useEffect(() => {
+          if (showCropUI && jamModeRef.current.audioBuffer) {
+            // Sync refs when state changes (when not dragging)
+            if (!waveformRef.current.dragging) {
+              waveformRef.current.currentCropStart = cropStart;
+              waveformRef.current.currentCropEnd = cropEnd;
+            }
+            drawWaveform();
+          }
+        }, [showCropUI, cropStart, cropEnd, audioDuration, darkMode, playbackTime]);
+        
+        // Continuously redraw waveform during playback for smooth indicator movement
+        React.useEffect(() => {
+          if (!isPlaying || !showCropUI) return;
+          let rafId = null;
+          const animate = () => {
+            drawWaveform();
+            rafId = requestAnimationFrame(animate);
+          };
+          rafId = requestAnimationFrame(animate);
+          return () => {
+            if (rafId) cancelAnimationFrame(rafId);
+          };
+        }, [isPlaying, showCropUI]);
+
+        // Helper function to convert AudioBuffer to WAV
+        const audioBufferToWav = (buffer) => {
+          const length = buffer.length * buffer.numberOfChannels * 2 + 44;
+          const arrayBuffer = new ArrayBuffer(length);
+          const view = new DataView(arrayBuffer);
+          const channels = [];
+          let offset = 0;
+          let pos = 0;
+
+          // Write WAV header
+          const setUint16 = (data) => {
+            view.setUint16(pos, data, true);
+            pos += 2;
+          };
+          const setUint32 = (data) => {
+            view.setUint32(pos, data, true);
+            pos += 4;
+          };
+
+          setUint32(0x46464952); // "RIFF"
+          setUint32(length - 8); // file length - 8
+          setUint32(0x45564157); // "WAVE"
+          setUint32(0x20746d66); // "fmt " chunk
+          setUint32(16); // chunk size
+          setUint16(1); // audio format (1 = PCM)
+          setUint16(buffer.numberOfChannels);
+          setUint32(buffer.sampleRate);
+          setUint32(buffer.sampleRate * 2 * buffer.numberOfChannels); // byte rate
+          setUint16(buffer.numberOfChannels * 2); // block align
+          setUint16(16); // bits per sample
+          setUint32(0x61746164); // "data" chunk
+          setUint32(length - pos - 4);
+
+          // Write audio data
+          for (let i = 0; i < buffer.numberOfChannels; i++) {
+            channels.push(buffer.getChannelData(i));
+          }
+          while (pos < length) {
+            for (let i = 0; i < buffer.length; i++) {
+              for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+                let sample = Math.max(-1, Math.min(1, channels[channel][i]));
+                sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                view.setInt16(pos, sample, true);
+                pos += 2;
+              }
+            }
+          }
+
+          return arrayBuffer;
+        };
+
+        // Cleanup on unmount
+        React.useEffect(() => {
+          return () => {
+            if (jamModeRef.current.countdownInterval) {
+              clearInterval(jamModeRef.current.countdownInterval);
+            }
+            if (jamModeRef.current.countdownTimeouts && jamModeRef.current.countdownTimeouts.length) {
+              jamModeRef.current.countdownTimeouts.forEach(t => clearTimeout(t));
+              jamModeRef.current.countdownTimeouts = [];
+            }
+            if (jamModeRef.current.mediaRecorder && jamModeRef.current.mediaRecorder.state !== 'inactive') {
+              jamModeRef.current.mediaRecorder.stop();
+            }
+          };
+        }, []);
 
         // Helpers: note name to midi and freq
         const noteNameToMidi = (name, octave) => {
@@ -836,6 +1949,7 @@
                   { key: 'Home', label: 'Home' },
                   { key: 'FretBoard', label: 'Fretboard' },
                   { key: 'Tuner', label: 'Tuner' },
+                  { key: 'Jam Mode', label: 'Jam Mode' },
                   { key: 'About', label: 'About' },
                 ].map(item => (
                   <button
@@ -858,9 +1972,9 @@
             {/* Main Content */}
             {page === 'Home' && (
               <div className="container mx-auto px-4 py-12">
-                <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-3xl font-semibold mb-3`}>Welcome to the FretLab</div>
+                <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-3xl font-semibold mb-3`}>Welcome to the FretLab :)</div>
                 <div className={`${darkMode ? 'text-slate-300' : 'text-slate-700'} mb-6`}>
-                  Hello, my younglings. Friendly reminder to practice your scales and chords.
+                  Hello, my younglings. Friendly reminder to practice your scales and chords EVERYDAY.
                 </div>
                 {/* image removed from Home */}
                 <div className="flex gap-3 mt-6">
@@ -1247,11 +2361,177 @@
             {page === 'About' && (
               <div className="container mx-auto px-4 py-12">
                 <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-2xl font-semibold mb-4`}>About</div>
+                <div className="text-white">Made by Nathan Kwon</div>
               </div>
             )}
 
-            {/* Chords in Scale - hidden on Home, Tuner, and About */}
-            {page !== 'Home' && page !== 'Tuner' && page !== 'About' && (
+            {page === 'Jam Mode' && (
+              <div className="container mx-auto px-4 py-12 max-w-5xl">
+                <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-2xl font-semibold mb-6`}>Jam Mode</div>
+
+                {/* Countdown Overlay */}
+                {isCountdownActive && countdown !== null && (
+                  <div className="fixed inset-0 z-40 pointer-events-none flex items-center justify-center">
+                    <div className={`text-[8rem] md:text-[10rem] font-extrabold drop-shadow ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                      {countdown}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* LEFT: Key + Progression */}
+                  <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'} border rounded-lg p-4`}>
+                    <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium mb-3`}>Key</div>
+                    <select
+                      value={selectedKey}
+                      onChange={(e) => setSelectedKey(e.target.value)}
+                      className={`w-full px-3 py-2 rounded border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                      disabled={isRecording || isCountdownActive}
+                    >
+                      {musicalKeys.map((key) => (
+                        <option key={key} value={key}>{key}</option>
+                      ))}
+                    </select>
+                    <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium mt-5 mb-3`}>Chord Progression</div>
+                    <select
+                      value={selectedProgression ?? ''}
+                      onChange={(e) => setSelectedProgression(e.target.value === '' ? null : parseInt(e.target.value))}
+                      className={`w-full px-3 py-2 rounded border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                    >
+                      <option value="">None</option>
+                      {chordProgressions.map((prog, idx) => (
+                        <option key={idx} value={idx}>{prog.name}</option>
+                      ))}
+                    </select>
+                    {selectedProgression !== null && chordProgressions[selectedProgression].romans.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {chordsForProgression(selectedKey, chordProgressions[selectedProgression].romans).map((chord, idx) => (
+                          <div key={idx} className={`px-3 py-1 rounded ${darkMode ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-900'} font-medium`}>
+                            {chord}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* RIGHT: Metronome */}
+                  <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'} border rounded-lg p-4`}>
+                    <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium mb-3`}>Metronome</div>
+                    <div className="flex items-center gap-3 mb-4">
+                      <input
+                        type="number"
+                        min={20}
+                        max={300}
+                        value={bpm}
+                        onChange={(e) => {
+                          const v = Math.max(20, Math.min(300, Number(e.target.value) || 0));
+                          setBpm(v);
+                        }}
+                        className={`w-24 px-3 py-2 rounded border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                      />
+                      <button
+                        onClick={() => setIsMetronomeEnabled(!isMetronomeEnabled)}
+                        className={`px-4 py-2 rounded font-medium ${isMetronomeEnabled ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                      >
+                        {isMetronomeEnabled ? 'Disable' : 'Enable'}
+                      </button>
+                    </div>
+                    <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Countdown: 1 bar at {bpm} BPM (starts metronome when recording)</div>
+                  </div>
+                </div>
+
+                {/* Bottom Center Controls */}
+                <div className="mt-8 flex flex-col items-center">
+                  <button
+                    onClick={() => (isRecording || isCountdownActive) ? stopRecording() : startRecording()}
+                    className={`px-7 py-3 rounded-lg font-semibold ${isRecording || isCountdownActive ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                    disabled={isCropping}
+                  >
+                    {isCountdownActive ? '⏹ Cancel Countdown' : isRecording ? '⏹ Stop Recording' : '● Start Recording'}
+                  </button>
+
+                  <div className="mt-4 flex items-center gap-3">
+                    <button
+                      onClick={() => isPlaying ? stopPlayback() : playRecordedAudio()}
+                      className={`px-5 py-2 rounded ${isPlaying ? 'bg-orange-600 hover:bg-orange-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                    >
+                      {isPlaying ? '⏸ Pause' : '▶ Play'}
+                    </button>
+                    <button
+                      onClick={() => { const nl = !isLooping; setIsLooping(nl); jamModeRef.current.shouldLoop = nl; }}
+                      className={`px-5 py-2 rounded ${isLooping ? 'bg-purple-600 hover:bg-purple-700 text-white' : (darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-900')}`}
+                    >
+                      {isLooping ? '🔁 Looping' : '🔁 Loop'}
+                    </button>
+                    <button
+                      onClick={() => setShowCropUI(!showCropUI)}
+                      className={`px-5 py-2 rounded ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-900'}`}
+                    >
+                      ✂ Edit
+                    </button>
+                    <button
+                      onClick={() => saveLoopToDb()}
+                      disabled={!recordedAudio}
+                      className={`px-5 py-2 rounded ${recordedAudio ? 'bg-teal-600 hover:bg-teal-700 text-white' : (darkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-400')}`}
+                    >
+                      💾 Save
+                    </button>
+                  </div>
+                </div>
+
+                {/* Trim UI (Waveform Editor) */}
+                {showCropUI && recordedAudio && (
+                  <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'} border rounded-lg p-4 mt-6 max-w-3xl mx-auto w-full`}>
+                    <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium mb-2`}>Trim</div>
+                    <div className={`text-xs mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      Drag the handles to remove audio from the beginning or end.
+                    </div>
+
+                    <div className={`${darkMode ? 'bg-slate-900' : 'bg-slate-100'} rounded-md p-3 border ${darkMode ? 'border-slate-700' : 'border-slate-300'}`}>
+                      <canvas id="waveform-canvas" width="800" height="140" className="w-full h-[140px] rounded bg-transparent cursor-pointer select-none touch-none" />
+                    </div>
+
+                    <div className="flex items-center gap-3 mt-4">
+                      <button onClick={cropAudio} disabled={isCropping || isRecording}
+                        className={`px-5 py-2 rounded ${isCropping || isRecording ? 'bg-slate-400 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
+                        {isCropping ? 'Trimming...' : 'Apply Trim'}
+                      </button>
+                      <button onClick={undoTrim} disabled={undoStack.length === 0 || isCropping || isRecording}
+                        className={`px-5 py-2 rounded ${undoStack.length === 0 || isCropping || isRecording ? 'bg-slate-400 text-white' : 'bg-amber-600 hover:bg-amber-700 text-white'}`}>
+                        ↺ Undo
+                      </button>
+                      <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Duration: {audioDuration.toFixed(2)}s</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Saved Loops */}
+                {savedLoops && savedLoops.length > 0 && (
+                  <div className="mt-6 max-w-5xl mx-auto w-full">
+                    <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium mb-2`}>Saved Loops</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {savedLoops.map(loop => (
+                        <div key={loop.id} className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'} border rounded p-3 flex items-center justify-between`}>
+                          <div>
+                            <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium text-sm`}>{loop.name || 'Untitled Loop'}</div>
+                            <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                              {loop.progressionName ? `${loop.progressionName} • ` : ''}Key: {loop.key} • BPM: {loop.bpm}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => loadLoop(loop.id)} className={`px-3 py-1.5 rounded ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-900'}`}>Load</button>
+                            <button onClick={() => deleteLoop(loop.id)} className={`px-3 py-1.5 rounded bg-red-600 hover:bg-red-700 text-white`}>Delete</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Chords in Scale - hidden on Home, Tuner, About, and Jam Mode */}
+            {page !== 'Home' && page !== 'Tuner' && page !== 'About' && page !== 'Jam Mode' && (
             <div className="container mx-auto px-4 py-8">
               <div className="mt-6">
                 <div className="flex items-center justify-between mb-3">
