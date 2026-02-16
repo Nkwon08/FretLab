@@ -4,12 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FretLab - Guitar Scale & Chord Explorer</title>
-    <meta name="description" content="Interactive guitar scale and chord explorer with fretboard visualization">
-    <!-- Inter font -->
+    <meta name="description" content="FretLab – scales, chords, tuner, jam">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Tailwind via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       :root { --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'; }
@@ -19,15 +17,11 @@
   <body class="antialiased">
     <div id="root"></div>
 
-    <!-- React and ReactDOM via CDN -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <!-- Babel for in-browser JSX transform -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Your component code (inlined for file:// compatibility) -->
     <script type="text/babel" data-presets="env,react">
-      /* global React */
       const { useState, useMemo } = React;
 
       const Sun = ({ size = 20 }) => (
@@ -69,24 +63,23 @@
         const [showDegrees, setShowDegrees] = useState(false);
         const [darkMode, setDarkMode] = useState(true);
         const [hoveredNote, setHoveredNote] = useState(null);
-        const [rootColor, setRootColor] = useState('#ef4444'); // red-500
-        const [noteColor, setNoteColor] = useState('#3b82f6'); // blue-500
-        const [thirdColor, setThirdColor] = useState('#10b981'); // green-500
-        const [chordType, setChordType] = useState('triads'); // triads | sevenths
+        const [rootColor, setRootColor] = useState('#ef4444');
+        const [noteColor, setNoteColor] = useState('#3b82f6');
+        const [thirdColor, setThirdColor] = useState('#10b981');
+        const [chordType, setChordType] = useState('triads');
         const [selectedChord, setSelectedChord] = useState(null);
-        const [startFret, setStartFret] = useState(1); // First fret to display
-        const [endFret, setEndFret] = useState(21); // Last fret to display
-        const [drawingMode, setDrawingMode] = useState(null); // 'draw' | 'erase' | null
-        const [drawings, setDrawings] = useState({}); // { 'string-fret': true }
+        const [startFret, setStartFret] = useState(1);
+        const [endFret, setEndFret] = useState(21);
+        const [drawingMode, setDrawingMode] = useState(null);
+        const [drawings, setDrawings] = useState({});
         const [savedDrawings, setSavedDrawings] = useState([]);
         const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-        const [page, setPage] = useState('Home'); // Home | Explorer | FretBoard | Tuner | About | Jam Mode
+        const [page, setPage] = useState('Home');
         const imgVersion = useMemo(() => Date.now(), []);
 
-        // --- Metronome ---
         const [bpm, setBpm] = useState(100);
         const [isMetronomeOn, setIsMetronomeOn] = useState(false);
-        const [isMetronomeEnabled, setIsMetronomeEnabled] = useState(true); // Jam Mode enable toggle
+        const [isMetronomeEnabled, setIsMetronomeEnabled] = useState(true);
         const metroRef = React.useRef({ audioCtx: null, intervalId: null });
         const click = () => {
           try {
@@ -102,9 +95,7 @@
             osc.connect(gain).connect(ctx.destination);
             osc.start();
             osc.stop(ctx.currentTime + 0.1);
-          } catch (e) {
-            /* no-op */
-          }
+          } catch (e) {}
         };
         const startMetronome = () => {
           if (isMetronomeOn) return;
@@ -130,9 +121,7 @@
             if (metroRef.current.intervalId) clearInterval(metroRef.current.intervalId);
           };
         }, [bpm, isMetronomeOn]);
-        // home image state removed (not needed)
 
-        // --- Tuner state ---
         const [isTunerOn, setIsTunerOn] = useState(false);
         const [tunerFreq, setTunerFreq] = useState(0);
         const [tunerNote, setTunerNote] = useState('-');
@@ -158,43 +147,39 @@
           buf: null,
         });
 
-        // Chromatic note names
         const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
-        // Tuning presets (headstock display, low->high)
-        const [tuning, setTuning] = useState('standard'); // standard | dropD | halfStepDown
+        const [tuning, setTuning] = useState('standard');
         const tuningPresets = {
           standard: ['E', 'A', 'D', 'G', 'B', 'E'],
           dropD: ['D', 'A', 'D', 'G', 'B', 'E'],
           halfStepDown: ['D#', 'G#', 'C#', 'F#', 'A#', 'D#'],
         };
 
-        // Headstock selection and confirmation logic
-        const [selectedString, setSelectedString] = useState(0); // 0 = lowest string in preset list
+        const [selectedString, setSelectedString] = useState(0);
         const [stringHoldStart, setStringHoldStart] = useState(null);
         const [stringConfirmed, setStringConfirmed] = useState(false);
         const [autoDetectString, setAutoDetectString] = useState(true);
 
-        // --- Jam Mode ---
         const [isRecording, setIsRecording] = useState(false);
         const [recordedAudio, setRecordedAudio] = useState(null);
         const [isPlaying, setIsPlaying] = useState(false);
         const [isLooping, setIsLooping] = useState(false);
-        const [selectedProgression, setSelectedProgression] = useState(null); // index into chordProgressions
+        const [selectedProgression, setSelectedProgression] = useState(null);
         const [audioDuration, setAudioDuration] = useState(0);
         const [cropStart, setCropStart] = useState(0);
         const [cropEnd, setCropEnd] = useState(0);
         const [isCropping, setIsCropping] = useState(false);
-        const [originalAudio, setOriginalAudio] = useState(null); // Store original before trimming for reset
-        const [undoStack, setUndoStack] = useState([]); // Stack of states for undo: [{audio, audioBuffer, cropStart, cropEnd, duration}]
+        const [originalAudio, setOriginalAudio] = useState(null);
+        const [undoStack, setUndoStack] = useState([]);
         const [selectedKey, setSelectedKey] = useState('C');
         const [countdown, setCountdown] = useState(null);
         const [isCountdownActive, setIsCountdownActive] = useState(false);
         const [showCropUI, setShowCropUI] = useState(false);
-        const [savedLoops, setSavedLoops] = useState([]); // [{id, name, createdAt, bpm, key, progressionName}]
-        const [playbackTime, setPlaybackTime] = useState(0); // Current playback position for waveform indicator
+        const [savedLoops, setSavedLoops] = useState([]);
+        const [playbackTime, setPlaybackTime] = useState(0);
         const [isLoopProcessing, setIsLoopProcessing] = useState(false);
-        const [loopQuantizeInfo, setLoopQuantizeInfo] = useState(null); // {beats, duration, bpm}
+        const [loopQuantizeInfo, setLoopQuantizeInfo] = useState(null);
         const idbRef = React.useRef({ db: null });
         const jamModeRef = React.useRef({
           mediaRecorder: null,
@@ -209,17 +194,17 @@
           metronomeStartedByRecording: false,
           countdownTimeouts: [],
         });
-        const LOOP_GRID_SUBDIVISIONS = 4; // 16th-note grid
-        const LOOP_CROSSFADE_TIME = 0.02; // seconds
+        const LOOP_GRID_SUBDIVISIONS = 4;
+        const LOOP_CROSSFADE_TIME = 0.02;
 
         const waveformRef = React.useRef({
           canvas: null,
           ctx: null,
-          dragging: null, // 'start' | 'end' | 'move' | null
-          dragOffset: 0, // Offset for moving entire selection
+          dragging: null,
+          dragOffset: 0,
           pixelsPerSecond: 100,
-          currentCropStart: null, // Current drag value for start
-          currentCropEnd: null, // Current drag value for end
+          currentCropStart: null,
+          currentCropEnd: null,
         });
         const cropBoundsRef = React.useRef({
           start: 0,
@@ -253,7 +238,6 @@
 
         const musicalKeys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
-        // Roman numeral progressions; case indicates chord quality (upper = major, lower = minor), 'vii°' diminished
         const chordProgressions = [
           { name: 'I-V-vi-IV', romans: ['I', 'V', 'vi', 'IV'] },
           { name: 'I-vi-IV-V', romans: ['I', 'vi', 'IV', 'V'] },
@@ -264,7 +248,7 @@
         ];
 
         const scaleNotesMajor = (root) => {
-          const all = musicalKeys; // enharmonic simplification
+          const all = musicalKeys;
           const idx = all.indexOf(root);
           if (idx < 0) return [];
           const majorSteps = [0, 2, 4, 5, 7, 9, 11];
@@ -299,16 +283,14 @@
             osc.connect(gain).connect(ctx.destination);
             osc.start();
             osc.stop(ctx.currentTime + 0.15);
-          } catch (e) {
-            /* no-op */
-          }
+          } catch (e) {}
         };
 
         const analyzeLoopEnvelope = (buffer) => {
           if (!buffer) return { start: 0, end: buffer ? buffer.duration : 0 };
           const sampleRate = buffer.sampleRate;
           const channelData = buffer.getChannelData(0);
-          const windowSize = Math.max(1, Math.floor(sampleRate * 0.005)); // 5ms
+          const windowSize = Math.max(1, Math.floor(sampleRate * 0.005));
           let maxAvg = 0;
           for (let i = 0; i < channelData.length; i += windowSize) {
             let sum = 0;
@@ -452,7 +434,6 @@
         };
 
         const startCountdown = async () => {
-          // Clear any prior countdown timers
           if (jamModeRef.current.countdownInterval) {
             clearInterval(jamModeRef.current.countdownInterval);
             jamModeRef.current.countdownInterval = null;
@@ -462,29 +443,24 @@
             jamModeRef.current.countdownTimeouts = [];
           }
 
-          // Prepare mic and recorder before countdown to avoid permission/creation latency
           const ok = await prepareRecorder();
           if (!ok) return;
 
           const bpmValue = Math.max(20, Math.min(300, bpm));
-          const beatInterval = 60000 / bpmValue; // ms per beat
-          // Compensate for MediaRecorder.start() latency (~50-100ms)
-          const recordingOffset = Math.min(80, beatInterval * 0.1); // Cap at 80ms or 10% of beat interval
+          const beatInterval = 60000 / bpmValue;
+          const recordingOffset = Math.min(80, beatInterval * 0.1);
 
           setIsCountdownActive(true);
-          setCountdown(1); // show big 1
-          playCountdownClick(); // beat 1 click
+          setCountdown(1);
+          playCountdownClick();
 
           const timeouts = [];
-          // Schedule beats 2, 3, 4
           [2,3,4].forEach((num, idx) => {
             timeouts.push(setTimeout(() => {
               setCountdown(num);
               playCountdownClick();
             }, (idx + 1) * beatInterval));
           });
-          // Start recording slightly before beat 5 to compensate for MediaRecorder.start() latency
-          // This ensures audio actually starts capturing at the right time
           timeouts.push(setTimeout(() => {
             setIsCountdownActive(false);
             setCountdown(null);
@@ -494,13 +470,9 @@
           jamModeRef.current.countdownTimeouts = timeouts;
         };
 
-        // Prepare MediaRecorder before countdown to eliminate start latency
         const prepareRecorder = async () => {
           try {
-            // If currently recording, don't re-prepare
             if (jamModeRef.current.mediaRecorder && jamModeRef.current.mediaRecorder.state === 'recording') return true;
-            // Note: We can't reuse MediaRecorder after stream is closed, so we always create new one
-            // But we prepare it early to minimize latency
 
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             const mediaRecorder = new MediaRecorder(stream);
@@ -512,10 +484,10 @@
               }
             };
 
-            const streamRef = stream; // Capture stream for onstop
+            const streamRef = stream;
             mediaRecorder.onstop = () => {
               const audioBlob = new Blob(jamModeRef.current.audioChunks, { type: 'audio/webm' });
-              setOriginalAudio(audioBlob); // Preserve raw take for undo/reset
+              setOriginalAudio(audioBlob);
               setRecordedAudio(null);
               setIsRecording(false);
               jamModeRef.current.audioBuffer = null;
@@ -546,21 +518,18 @@
             if (!ok) return;
             mr = jamModeRef.current.mediaRecorder;
           }
-          // Reset chunks array for new recording
           if (mr && mr.state === 'inactive') {
             jamModeRef.current.audioChunks = [];
           }
           try {
             mr.start();
             setIsRecording(true);
-            // Start metronome only if enabled and not already running
             if (isMetronomeEnabled && !isMetronomeOn) {
               startMetronome();
               jamModeRef.current.metronomeStartedByRecording = true;
             }
           } catch (e) {
             console.error('Failed to start MediaRecorder, retrying with fresh recorder:', e);
-            // Try once more with a fresh recorder
             jamModeRef.current.mediaRecorder = null;
             const ok = await prepareRecorder();
             if (!ok) return;
@@ -580,35 +549,28 @@
 
         const startRecording = async () => {
           if (isRecording || isCountdownActive) return;
-          // Start preparing recorder immediately for minimal latency
           prepareRecorder();
           startCountdown();
         };
 
         const undoTrim = async () => {
           if (undoStack.length === 0) return;
-          
-          // Stop any playback
+
           if (isPlaying) stopPlayback();
-          
-          // Pop the last state from undo stack
+
           const stateToRestore = undoStack[undoStack.length - 1];
-          setUndoStack(prev => prev.slice(0, -1)); // Remove last item
-          
-          // Restore the state
+          setUndoStack(prev => prev.slice(0, -1));
+
           setRecordedAudio(stateToRestore.audio);
-          
-          // Restore audio buffer if available, otherwise decode
+
           if (stateToRestore.audioBuffer) {
             jamModeRef.current.audioBuffer = stateToRestore.audioBuffer;
             setAudioDuration(stateToRestore.duration);
             setCropStart(stateToRestore.cropStart);
             setCropEnd(stateToRestore.cropEnd);
-            
-            // Redraw waveform
+
             setTimeout(() => drawWaveform(), 50);
           } else {
-            // Need to decode the audio
             const audioUrl = URL.createObjectURL(stateToRestore.audio);
             const audio = new Audio(audioUrl);
             audio.addEventListener('loadedmetadata', async () => {
@@ -616,8 +578,7 @@
               setCropStart(stateToRestore.cropStart || 0);
               setCropEnd(stateToRestore.cropEnd || (stateToRestore.duration || audio.duration));
               audio.remove();
-              
-              // Reload waveform buffer
+
               try {
                 const resp = await fetch(audioUrl);
                 const arr = await resp.arrayBuffer();
@@ -626,8 +587,7 @@
                 jamModeRef.current.audioBuffer = decoded;
                 ac.close();
                 URL.revokeObjectURL(audioUrl);
-                
-                // Redraw waveform
+
                 setTimeout(() => drawWaveform(), 50);
               } catch (e) {
                 console.error('Failed to reload waveform:', e);
@@ -638,7 +598,6 @@
         };
 
         const stopRecording = () => {
-          // Cancel countdown if active
           if (isCountdownActive) {
             if (jamModeRef.current.countdownInterval) {
               clearInterval(jamModeRef.current.countdownInterval);
@@ -652,14 +611,12 @@
             setCountdown(null);
             return;
           }
-          
-          // Stop actual recording or release prepared stream if any
+
           const mr = jamModeRef.current.mediaRecorder;
           if (mr) {
             if (mr.state !== 'inactive') {
               mr.stop();
             } else {
-              // If prepared but not started, close tracks
               try {
                 const tracks = mr.stream ? mr.stream.getTracks() : [];
                 tracks.forEach(t => t.stop());
@@ -675,26 +632,23 @@
 
         const playRecordedAudio = () => {
           if (!recordedAudio) return;
-          if (!jamModeRef.current.shouldLoop && isPlaying) return; // Prevent duplicate playback when not looping
-          
+          if (!jamModeRef.current.shouldLoop && isPlaying) return;
+
           jamModeRef.current.shouldLoop = isLooping;
-          
+
           const audioUrl = URL.createObjectURL(recordedAudio);
           const audio = new Audio(audioUrl);
-          
-          // Update playback time for waveform indicator
+
           audio.addEventListener('timeupdate', () => {
             setPlaybackTime(audio.currentTime);
           });
           
           audio.onended = () => {
-            setPlaybackTime(0); // Reset indicator
+            setPlaybackTime(0);
             URL.revokeObjectURL(audioUrl);
             if (jamModeRef.current.shouldLoop && jamModeRef.current.sourceNode === audio) {
-              // Loop immediately - no delay
               jamModeRef.current.sourceNode = null;
               if (jamModeRef.current.shouldLoop) {
-                // Start next loop immediately
                 playRecordedAudio();
               } else {
                 setIsPlaying(false);
@@ -732,7 +686,7 @@
           if (jamModeRef.current.sourceNode) {
             jamModeRef.current.sourceNode.pause();
             jamModeRef.current.sourceNode.currentTime = 0;
-            jamModeRef.current.sourceNode.onended = null; // Prevent onended from firing
+            jamModeRef.current.sourceNode.onended = null;
             jamModeRef.current.sourceNode = null;
           }
           setPlaybackTime(0); // Reset indicator
@@ -740,7 +694,6 @@
           setIsLooping(false);
         };
 
-        // IndexedDB helpers for saving loops in-browser
         const openDb = () => new Promise((resolve, reject) => {
           if (idbRef.current.db) return resolve(idbRef.current.db);
           const req = indexedDB.open('fretlab', 1);
@@ -807,10 +760,9 @@
               const item = req.result;
               if (!item) return resolve(null);
               setRecordedAudio(item.blob);
-              setOriginalAudio(item.blob); // Set as original
-              setUndoStack([]); // Clear undo history
+              setOriginalAudio(item.blob);
+              setUndoStack([]);
               setLoopQuantizeInfo(null);
-              // Re-decode for waveform
               jamModeRef.current.audioBuffer = null;
               setAudioDuration(0);
               setCropStart(0);
@@ -859,8 +811,7 @@
             const startSample = Math.floor(startTime * sampleRate);
             const endSample = Math.floor(endTime * sampleRate);
             const length = endSample - startSample;
-            
-            // Create new audio buffer with cropped portion
+
             const croppedBuffer = audioContext.createBuffer(
               audioBuffer.numberOfChannels,
               length,
@@ -874,22 +825,18 @@
                 newData[i] = oldData[startSample + i];
               }
             }
-            
-            // Convert back to WAV blob
+
             const wav = audioBufferToWav(croppedBuffer);
             const croppedBlob = new Blob([wav], { type: 'audio/wav' });
 
-            // Stop any active playback before updating to new cropped version
             if (isPlaying) {
               stopPlayback();
             }
-            
-            // Store original before trimming if not already stored
+
             if (!originalAudio) {
               setOriginalAudio(recordedAudio);
             }
-            
-            // Push current state to undo stack before applying trim
+
             setUndoStack(prev => [...prev, {
               audio: recordedAudio,
               audioBuffer: jamModeRef.current.audioBuffer ? jamModeRef.current.audioBuffer : null,
@@ -897,8 +844,7 @@
               cropEnd,
               duration: audioDuration
             }]);
-            
-            // Update state and in-memory buffer so the waveform itself is trimmed
+
             setRecordedAudio(croppedBlob);
             jamModeRef.current.audioBuffer = croppedBuffer;
             const newDuration = endTime - startTime;
@@ -906,14 +852,12 @@
             setCropStart(0);
             setCropEnd(newDuration);
             setLoopQuantizeInfo(null);
-            // Clear any previous audio source nodes
             if (jamModeRef.current.sourceNode) {
               try {
                 jamModeRef.current.sourceNode.pause();
                 jamModeRef.current.sourceNode = null;
               } catch {}
             }
-            // Redraw waveform to reflect new buffer size
             setTimeout(() => { try { drawWaveform(); } catch (_) {} }, 0);
 
             URL.revokeObjectURL(audioUrl);
@@ -926,7 +870,6 @@
           }
         };
 
-        // Waveform rendering and drag-to-trim
         const drawWaveform = () => {
           const canvas = document.getElementById('waveform-canvas');
           if (!canvas || !jamModeRef.current.audioBuffer) return;
@@ -935,11 +878,9 @@
           const mid = Math.floor(height / 2);
           ctx.clearRect(0, 0, width, height);
 
-          // Background
           ctx.fillStyle = darkMode ? '#0f172a' : '#f1f5f9';
           ctx.fillRect(0, 0, width, height);
 
-          // Center line
           ctx.strokeStyle = darkMode ? '#334155' : '#94a3b8';
           ctx.lineWidth = 1;
           ctx.beginPath();
@@ -951,7 +892,6 @@
           const channelData = buffer.getChannelData(0);
           const samplesPerPixel = Math.max(1, Math.floor(channelData.length / width));
 
-          // Beat/grid overlay
           if (audioDuration > 0) {
             const beatSeconds = 60 / Math.max(20, Math.min(300, bpm));
             const gridSeconds = beatSeconds / LOOP_GRID_SUBDIVISIONS;
@@ -971,7 +911,6 @@
             }
           }
 
-          // Waveform
           ctx.strokeStyle = darkMode ? '#38bdf8' : '#0ea5e9';
           ctx.lineWidth = 1;
           ctx.beginPath();
@@ -990,35 +929,27 @@
           }
           ctx.stroke();
 
-          // Dim areas that will be cut (outside selection) - use refs for current drag values
           const currentStart = waveformRef.current.currentCropStart ?? cropStart;
           const currentEnd = waveformRef.current.currentCropEnd ?? cropEnd;
           const toX = (sec) => Math.round((sec / audioDuration) * width);
           const selX1 = toX(Math.max(0, Math.min(audioDuration, currentStart)));
           const selX2 = toX(Math.max(0, Math.min(audioDuration, currentEnd)));
-          
-          // Dim left side (will be cut)
+
           ctx.fillStyle = darkMode ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.15)';
           ctx.fillRect(0, 0, selX1, height);
-          // Dim right side (will be cut)
           ctx.fillRect(selX2, 0, width - selX2, height);
-          
-          // Highlight selection area (will be kept)
+
           ctx.fillStyle = darkMode ? 'rgba(34,197,94,0.25)' : 'rgba(34,197,94,0.2)';
           ctx.fillRect(selX1, 0, Math.max(2, selX2 - selX1), height);
-          
-          // Border around selection
+
           ctx.strokeStyle = darkMode ? '#22c55e' : '#16a34a';
           ctx.lineWidth = 2;
           ctx.strokeRect(selX1, 0, Math.max(2, selX2 - selX1), height);
 
-          // Handles - larger and more visible
           const handleWidth = 8;
-          const handleHitWidth = 20; // Larger hit area for easier grabbing
+          const handleHitWidth = 20;
           ctx.fillStyle = darkMode ? '#22c55e' : '#16a34a';
-          // Left handle
           ctx.fillRect(selX1 - handleWidth / 2, 0, handleWidth, height);
-          // Handle grip lines for visual feedback
           ctx.strokeStyle = darkMode ? '#16a34a' : '#15803d';
           ctx.lineWidth = 2;
           for (let i = 0; i < 3; i++) {
@@ -1028,7 +959,6 @@
             ctx.lineTo(selX1 + handleWidth / 2 - 2, yPos);
             ctx.stroke();
           }
-          // Right handle
           ctx.fillStyle = darkMode ? '#22c55e' : '#16a34a';
           ctx.fillRect(selX2 - handleWidth / 2, 0, handleWidth, height);
           ctx.strokeStyle = darkMode ? '#16a34a' : '#15803d';
@@ -1067,8 +997,7 @@
           let rafId = null;
           const canvas = document.getElementById('waveform-canvas');
           if (!canvas) return;
-          
-          // Local drawWaveform that uses current state values
+
           const drawWaveformLocal = () => {
             if (!canvas || !jamModeRef.current.audioBuffer) return;
             const ctx = canvas.getContext('2d');
@@ -1076,11 +1005,9 @@
             const mid = Math.floor(height / 2);
             ctx.clearRect(0, 0, width, height);
 
-            // Background
             ctx.fillStyle = darkMode ? '#0f172a' : '#f1f5f9';
             ctx.fillRect(0, 0, width, height);
 
-            // Center line
             ctx.strokeStyle = darkMode ? '#334155' : '#94a3b8';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -1092,7 +1019,6 @@
             const channelData = buffer.getChannelData(0);
             const samplesPerPixel = Math.max(1, Math.floor(channelData.length / width));
 
-            // Waveform
             ctx.strokeStyle = darkMode ? '#38bdf8' : '#0ea5e9';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -1111,44 +1037,35 @@
             }
             ctx.stroke();
 
-            // Get current crop values - use refs for immediate updates during drag
             const currentStart = waveformRef.current.currentCropStart ?? cropBoundsRef.current.start;
             const currentEnd = waveformRef.current.currentCropEnd ?? cropBoundsRef.current.end;
             const currentDuration = cropBoundsRef.current.duration || audioDuration || 1;
             const safeDuration = Math.max(0.0001, currentDuration);
 
-            // Dim areas that will be cut (outside selection)
             const toX = (sec) => Math.round((sec / safeDuration) * width);
             const selX1 = toX(Math.max(0, Math.min(currentDuration, currentStart)));
             const selX2 = toX(Math.max(0, Math.min(currentDuration, currentEnd)));
-            
-            // Dim left side (will be cut)
+
             ctx.fillStyle = darkMode ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.15)';
             ctx.fillRect(0, 0, selX1, height);
-            // Dim right side (will be cut)
             ctx.fillRect(selX2, 0, width - selX2, height);
-            
-            // Highlight selection area (will be kept)
+
             ctx.fillStyle = darkMode ? 'rgba(34,197,94,0.25)' : 'rgba(34,197,94,0.2)';
             ctx.fillRect(selX1, 0, Math.max(2, selX2 - selX1), height);
-            
-            // Border around selection
+
             ctx.strokeStyle = darkMode ? '#22c55e' : '#16a34a';
             ctx.lineWidth = 2;
             ctx.strokeRect(selX1, 0, Math.max(2, selX2 - selX1), height);
 
-            // Progress bar - black vertical indicator showing playback position
             const isPlayingNow = playbackRef.current.isPlaying;
             const playbackPos = playbackRef.current.time;
             if (isPlayingNow && playbackPos > 0 && safeDuration > 0) {
               const playbackClamped = Math.max(0, Math.min(safeDuration, playbackPos));
               const playbackX = toX(playbackClamped);
-              
-              // Draw black vertical progress bar
-              ctx.fillStyle = '#000000'; // Black color
-              ctx.fillRect(playbackX - 2, 0, 4, height); // 4px wide vertical bar
-              
-              // Optional: Add a small triangle or circle at the top for better visibility
+
+              ctx.fillStyle = '#000000';
+              ctx.fillRect(playbackX - 2, 0, 4, height);
+
               ctx.fillStyle = '#000000';
               ctx.beginPath();
               ctx.moveTo(playbackX - 6, 0);
@@ -1158,12 +1075,9 @@
               ctx.fill();
             }
 
-            // Handles - larger and more visible
             const handleWidth = 8;
             ctx.fillStyle = darkMode ? '#22c55e' : '#16a34a';
-            // Left handle
             ctx.fillRect(selX1 - handleWidth / 2, 0, handleWidth, height);
-            // Handle grip lines for visual feedback
             ctx.strokeStyle = darkMode ? '#16a34a' : '#15803d';
             ctx.lineWidth = 2;
             for (let i = 0; i < 3; i++) {
@@ -1173,7 +1087,6 @@
               ctx.lineTo(selX1 + handleWidth / 2 - 2, yPos);
               ctx.stroke();
             }
-            // Right handle
             ctx.fillStyle = darkMode ? '#22c55e' : '#16a34a';
             ctx.fillRect(selX2 - handleWidth / 2, 0, handleWidth, height);
             ctx.strokeStyle = darkMode ? '#16a34a' : '#15803d';
@@ -1209,9 +1122,8 @@
             const currentEnd = waveformRef.current.currentCropEnd ?? (cropBoundsRef.current.end ?? duration);
             const startX = (currentStart / duration) * width;
             const endX = (currentEnd / duration) * width;
-            const handleHitWidth = 30; // Large hit area for easy grabbing
-            
-            // Determine what we're dragging
+            const handleHitWidth = 30;
+
             const distToStart = Math.abs(x - startX);
             const distToEnd = Math.abs(x - endX);
             const isNearStart = distToStart < handleHitWidth;
@@ -1219,30 +1131,24 @@
             const isInSelection = x >= startX && x <= endX && !isNearStart && !isNearEnd;
             
             if (isNearStart && distToStart <= distToEnd) {
-              // Dragging start handle
               waveformRef.current.dragging = 'start';
               waveformRef.current.dragStartX = x;
             } else if (isNearEnd) {
-              // Dragging end handle
               waveformRef.current.dragging = 'end';
               waveformRef.current.dragStartX = x;
             } else if (isInSelection) {
-              // Dragging entire selection
               waveformRef.current.dragging = 'move';
               waveformRef.current.dragStartX = x;
               waveformRef.current.dragOffset = x - startX;
             } else {
-              // Clicked outside - snap nearest handle to click position
               const clickSec = getSecFromX(clientX);
               if (x < startX) {
-                // Click before start
                 waveformRef.current.dragging = 'start';
                 waveformRef.current.dragStartX = x;
                 const newStart = Math.max(0, Math.min(clickSec, currentEnd - 0.05));
                 setCropStart(newStart);
                 waveformRef.current.currentCropStart = newStart;
               } else {
-                // Click after end
                 waveformRef.current.dragging = 'end';
                 waveformRef.current.dragStartX = x;
                 const newEnd = Math.min(duration, Math.max(clickSec, currentStart + 0.05));
@@ -1251,7 +1157,7 @@
               }
             }
             down = true;
-            canvas.setPointerCapture?.(e.pointerId || 0); // Capture pointer for smooth dragging
+            canvas.setPointerCapture?.(e.pointerId || 0);
           };
           
           const onMove = (e) => {
@@ -1278,7 +1184,6 @@
               waveformRef.current.currentCropEnd = newEnd;
               setCropEnd(newEnd);
             } else if (waveformRef.current.dragging === 'move') {
-              // Move entire selection while maintaining width
               const selectionWidth = Math.max(0.05, (currentEnd ?? duration) - (currentStart ?? 0));
               const offsetInSec = (waveformRef.current.dragOffset / width) * duration;
               const newStart = Math.max(0, Math.min(sec - offsetInSec, duration - selectionWidth));
@@ -1288,8 +1193,7 @@
               setCropStart(newStart);
               setCropEnd(newEnd);
             }
-            
-            // Continuous redraw for smooth dragging
+
             if (rafId) cancelAnimationFrame(rafId);
             rafId = requestAnimationFrame(() => {
               drawWaveformLocal();
@@ -1306,27 +1210,24 @@
             waveformRef.current.dragging = null;
             waveformRef.current.dragStartX = null;
             waveformRef.current.dragOffset = null;
-            // Clear refs so we use state values after drag
             waveformRef.current.currentCropStart = null;
             waveformRef.current.currentCropEnd = null;
-            drawWaveformLocal(); // Final redraw with state values
+            drawWaveformLocal();
           };
 
-          // Set up canvas for smooth interaction
           canvas.style.userSelect = 'none';
           canvas.style.touchAction = 'none';
           canvas.style.cursor = 'pointer';
           
           (async () => {
             await ensureWaveformBuffer();
-            // Initialize refs to current state
             waveformRef.current.currentCropStart = cropStart;
             waveformRef.current.currentCropEnd = cropEnd;
             drawWaveformLocal();
           })();
 
           const onHover = (e) => {
-            if (!canvas || down) return; // Don't change cursor while dragging
+            if (!canvas || down) return;
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const width = rect.width;
@@ -1341,17 +1242,16 @@
             const distToEnd = Math.abs(x - endX);
             
             if (distToStart < handleHitWidth || distToEnd < handleHitWidth) {
-              canvas.style.cursor = 'ew-resize'; // Resize cursor for handles
+              canvas.style.cursor = 'ew-resize';
             } else if (x >= startX && x <= endX) {
-              canvas.style.cursor = 'grab'; // Grab cursor for selection area
+              canvas.style.cursor = 'grab';
             } else {
-              canvas.style.cursor = 'pointer'; // Pointer for clicking to set trim points
+              canvas.style.cursor = 'pointer';
             }
           };
 
           window.addEventListener('resize', onResize);
-          
-          // Pointer move handler (for both hover and drag)
+
           const pointerMoveHandler = (e) => {
             if (!down) {
               onHover(e);
@@ -1359,8 +1259,7 @@
               onMove(e);
             }
           };
-          
-          // Mouse move handler (for both hover and drag)
+
           const mouseMoveHandler = (e) => {
             if (!down) {
               onHover(e);
@@ -1368,17 +1267,14 @@
               onMove(e);
             }
           };
-          
-          // Use pointer events for better cross-device support
+
           canvas.addEventListener('pointerdown', onDown);
           canvas.addEventListener('pointermove', pointerMoveHandler);
           window.addEventListener('pointerup', onUp);
           window.addEventListener('pointercancel', onUp);
-          // Fallback for older browsers
           canvas.addEventListener('mousedown', onDown);
           canvas.addEventListener('mousemove', mouseMoveHandler);
           window.addEventListener('mouseup', onUp);
-          // Touch events for mobile
           canvas.addEventListener('touchstart', onDown, { passive: false });
           canvas.addEventListener('touchmove', onMove, { passive: false });
           window.addEventListener('touchend', onUp);
@@ -1387,16 +1283,13 @@
             if (canvas) canvas.style.cursor = 'default';
             if (rafId) cancelAnimationFrame(rafId);
             window.removeEventListener('resize', onResize);
-            // Pointer events
             canvas.removeEventListener('pointerdown', onDown);
             canvas.removeEventListener('pointermove', pointerMoveHandler);
             window.removeEventListener('pointerup', onUp);
             window.removeEventListener('pointercancel', onUp);
-            // Mouse events (fallback)
             canvas.removeEventListener('mousedown', onDown);
             canvas.removeEventListener('mousemove', mouseMoveHandler);
             window.removeEventListener('mouseup', onUp);
-            // Touch events
             canvas.removeEventListener('touchstart', onDown);
             canvas.removeEventListener('touchmove', onMove);
             window.removeEventListener('touchend', onUp);
@@ -1406,7 +1299,6 @@
 
         React.useEffect(() => {
           if (showCropUI && jamModeRef.current.audioBuffer) {
-            // Sync refs when state changes (when not dragging)
             if (!waveformRef.current.dragging) {
               waveformRef.current.currentCropStart = cropStart;
               waveformRef.current.currentCropEnd = cropEnd;
@@ -1414,8 +1306,7 @@
             drawWaveform();
           }
         }, [showCropUI, cropStart, cropEnd, audioDuration, darkMode, playbackTime, bpm]);
-        
-        // Continuously redraw waveform during playback for smooth indicator movement
+
         React.useEffect(() => {
           if (!isPlaying || !showCropUI) return;
           let rafId = null;
@@ -1429,7 +1320,6 @@
           };
         }, [isPlaying, showCropUI]);
 
-        // Helper function to convert AudioBuffer to WAV
         const audioBufferToWav = (buffer) => {
           const length = buffer.length * buffer.numberOfChannels * 2 + 44;
           const arrayBuffer = new ArrayBuffer(length);
@@ -1438,7 +1328,6 @@
           let offset = 0;
           let pos = 0;
 
-          // Write WAV header
           const setUint16 = (data) => {
             view.setUint16(pos, data, true);
             pos += 2;
@@ -1448,21 +1337,20 @@
             pos += 4;
           };
 
-          setUint32(0x46464952); // "RIFF"
-          setUint32(length - 8); // file length - 8
-          setUint32(0x45564157); // "WAVE"
-          setUint32(0x20746d66); // "fmt " chunk
-          setUint32(16); // chunk size
-          setUint16(1); // audio format (1 = PCM)
+          setUint32(0x46464952);
+          setUint32(length - 8);
+          setUint32(0x45564157);
+          setUint32(0x20746d66);
+          setUint32(16);
+          setUint16(1);
           setUint16(buffer.numberOfChannels);
           setUint32(buffer.sampleRate);
-          setUint32(buffer.sampleRate * 2 * buffer.numberOfChannels); // byte rate
-          setUint16(buffer.numberOfChannels * 2); // block align
-          setUint16(16); // bits per sample
-          setUint32(0x61746164); // "data" chunk
+          setUint32(buffer.sampleRate * 2 * buffer.numberOfChannels);
+          setUint16(buffer.numberOfChannels * 2);
+          setUint16(16);
+          setUint32(0x61746164);
           setUint32(length - pos - 4);
 
-          // Write audio data
           for (let i = 0; i < buffer.numberOfChannels; i++) {
             channels.push(buffer.getChannelData(i));
           }
@@ -1480,7 +1368,6 @@
           return arrayBuffer;
         };
 
-        // Cleanup on unmount
         React.useEffect(() => {
           return () => {
             if (jamModeRef.current.countdownInterval) {
@@ -1496,24 +1383,19 @@
           };
         }, []);
 
-        // Helpers: note name to midi and freq
         const noteNameToMidi = (name, octave) => {
           const idx = noteNames.indexOf(name);
           if (idx < 0) return null;
-          return (octave + 1) * 12 + idx; // MIDI formula
+          return (octave + 1) * 12 + idx;
         };
         const midiToFreq = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
         const buildTargetFreqs = (presetKey) => {
-          // Default octaves per string low->high for standard: E2 A2 D3 G3 B3 E4
           const baseOctavesStandard = [2,2,3,3,3,4];
           const names = tuningPresets[presetKey];
           if (!names) return [];
-          // Adjust low string for dropD and halfStepDown
           const octaves = [...baseOctavesStandard];
-          if (presetKey === 'dropD') octaves[0] = 2; // D2
-          if (presetKey === 'halfStepDown') {
-            // E2->D#2 etc., octaves unchanged
-          }
+          if (presetKey === 'dropD') octaves[0] = 2;
+          if (presetKey === 'halfStepDown') {}
           return names.map((n, i) => {
             const midi = noteNameToMidi(n, octaves[i]);
             return midi != null ? midiToFreq(midi) : null;
@@ -1521,7 +1403,6 @@
         };
         const targetFreqs = buildTargetFreqs(tuning);
 
-        // Pluck sound synth
         const pluckRef = React.useRef({ audioCtx: null });
         const playPluck = (freq, idx = null) => {
           try {
@@ -1531,7 +1412,6 @@
             const duration = 2.2;
             const now = ctx.currentTime;
 
-            // Multiple oscillators with detuning for natural beating
             const osc1 = ctx.createOscillator();
             const osc2 = ctx.createOscillator();
             const osc3 = ctx.createOscillator();
@@ -1540,16 +1420,14 @@
             osc3.type = 'sine';
             osc1.frequency.setValueAtTime(freq, now);
             osc2.frequency.setValueAtTime(freq * 0.996, now);
-            osc3.frequency.setValueAtTime(freq * 2, now); // octave harmonic
+            osc3.frequency.setValueAtTime(freq * 2, now);
 
-            // Realistic guitar string filtering
             const lp1 = ctx.createBiquadFilter();
             lp1.type = 'lowpass';
             lp1.frequency.setValueAtTime(3000, now);
             lp1.frequency.exponentialRampToValueAtTime(1800, now + 0.1);
             lp1.Q.setValueAtTime(0.8, now);
 
-            // Acoustic body resonance peaks
             const body1 = ctx.createBiquadFilter();
             body1.type = 'peaking';
             body1.frequency.setValueAtTime(180 + freq * 0.1, now);
@@ -1561,7 +1439,6 @@
             body2.gain.setValueAtTime(6, now);
             body2.Q.setValueAtTime(1.5, now);
 
-            // More realistic pick attack (filtered noise)
             const attackLen = 0.08 * ctx.sampleRate;
             const noiseBuf = ctx.createBuffer(1, attackLen, ctx.sampleRate);
             const data = noiseBuf.getChannelData(0);
@@ -1575,28 +1452,24 @@
             noiseGain.gain.setValueAtTime(0.25, now);
             noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
-            // String damping over time
             const damping = ctx.createGain();
             damping.gain.setValueAtTime(1, now);
             damping.gain.exponentialRampToValueAtTime(0.3, now + 0.5);
             damping.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
-            // Master envelope (boost G/B strings louder, D string moderate)
             const gain = ctx.createGain();
             let baseVolume = 0.6;
-            if (idx === 3 || idx === 4) baseVolume = 1.0; // G and B strings (idx 3, 4) louder
-            else if (idx === 2) baseVolume = 0.85; // D string (idx 2) moderate boost
+            if (idx === 3 || idx === 4) baseVolume = 1.0;
+            else if (idx === 2) baseVolume = 0.85;
             gain.gain.setValueAtTime(0.001, now);
             gain.gain.exponentialRampToValueAtTime(baseVolume, now + 0.008);
             gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
-            // Subtle stereo chorus for width
             const delay = ctx.createDelay(0.1);
             delay.delayTime.setValueAtTime(0.008, now);
             const feedback = ctx.createGain();
             feedback.gain.setValueAtTime(0.12, now);
 
-            // Connect graph
             osc1.connect(lp1);
             osc2.connect(lp1);
             osc3.connect(lp1);
@@ -1607,7 +1480,6 @@
             delay.connect(gain);
             gain.connect(ctx.destination);
 
-            // Start/stop
             osc1.start(now);
             osc2.start(now);
             osc3.start(now);
@@ -1616,12 +1488,9 @@
             osc2.stop(now + duration);
             osc3.stop(now + duration);
             noise.stop(now + 0.08);
-          } catch (e) {
-            /* no-op */
-          }
+          } catch (e) {}
         };
 
-        // Sample-based playback (optional assets)
         const sampleRef = React.useRef({ audioCtx: null, cache: new Map() });
         const getStringNameAndOctave = (presetKey, idx) => {
           const baseOctavesStandard = [2,2,3,3,3,4];
@@ -1660,10 +1529,9 @@
             const src = ctx.createBufferSource();
             src.buffer = buffer;
             const gain = ctx.createGain();
-            // Boost G (idx 3) and B (idx 4) strings louder, D (idx 2) moderate boost
             let baseGain = 0.9;
-            if (idx === 3 || idx === 4) baseGain = 1.7; // G and B strings louder
-            else if (idx === 2) baseGain = 1.4; // D string moderate boost
+            if (idx === 3 || idx === 4) baseGain = 1.7;
+            else if (idx === 2) baseGain = 1.4;
             gain.gain.setValueAtTime(baseGain, ctx.currentTime);
             src.connect(gain).connect(ctx.destination);
             src.start();
@@ -1681,7 +1549,6 @@
         };
 
         React.useEffect(() => {
-          // Reset confirmation when tuning preset or selected string changes
           setStringHoldStart(null);
           setStringConfirmed(false);
         }, [tuning, selectedString]);
@@ -1692,7 +1559,6 @@
             setStringConfirmed(false);
             return;
           }
-          // Auto-detect likely string based on nearest target frequency
           if (autoDetectString && tunerFreq > 0 && targetFreqs && targetFreqs.length === 6) {
             let bestIdx = selectedString;
             let bestDiff = Infinity;
@@ -1785,12 +1651,11 @@
         };
 
         const autoCorrelate = (buf, sampleRate) => {
-          // Autocorrelation-based pitch detection
           const SIZE = buf.length;
           let rms = 0;
           for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
           rms = Math.sqrt(rms / SIZE);
-          if (rms < 0.008) return { freq: -1, rms }; // too low signal
+          if (rms < 0.008) return { freq: -1, rms };
 
           let r1 = 0, r2 = SIZE - 1, thres = 0.2;
           for (let i = 0; i < SIZE / 2; i++) if (Math.abs(buf[i]) < thres) { r1 = i; break; }
@@ -1870,8 +1735,6 @@
           setTunerNote('-');
           setTunerCents(0);
         };
-
-        // sound removed
 
         const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
         
@@ -1968,11 +1831,8 @@
 
         const formatDegree = (degree, noteIndex) => {
           if (!degree) return null;
-          
-          // Get the interval for this degree in the current scale
+
           const interval = scales[scaleType][degree - 1];
-          
-          // Check if this interval is flatted or sharped compared to major scale
           const majorIntervals = scales.major;
           const majorIntervalForThisPosition = majorIntervals[Math.min(degree - 1, majorIntervals.length - 1)];
           
@@ -2009,8 +1869,6 @@
           return (noteIndex % 12) === selectedChord.pcs[1];
         };
 
-
-        // --- Chords ---
         const rotateArray = (arr, start) => arr.slice(start).concat(arr.slice(0, start));
         const pcDistance = (a, b) => (b - a + 12) % 12;
         const intervalsToQualityTriad = (iv) => {
@@ -2135,8 +1993,6 @@
                       </select>
                     </div>
 
-                    {/* Scale Type moved next to Root Note */}
-
                     <div className="flex flex-col">
                       <label className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                         Root Color
@@ -2240,7 +2096,6 @@
               </div>
             </div>
 
-            {/* Sidebar Overlay */}
             {isSidebarOpen && (
               <div
                 className="fixed inset-0 bg-black/50 z-40"
@@ -2248,7 +2103,6 @@
               />
             )}
 
-            {/* Sidebar Panel */}
             <div
               className={`fixed top-0 left-0 h-full w-64 z-50 transform transition-transform duration-300 ${
                 isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -2289,14 +2143,12 @@
               </nav>
                 </div>
 
-            {/* Main Content */}
             {page === 'Home' && (
               <div className="container mx-auto px-4 py-12">
-                <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-3xl font-semibold mb-3`}>Welcome to the FretLab :)</div>
+                <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-3xl font-semibold mb-3`}>FretLab</div>
                 <div className={`${darkMode ? 'text-slate-300' : 'text-slate-700'} mb-6`}>
-                  Hello, this is your friendly reminder to practice your scales and chords EVERYDAY.
+                  Practice your scales and chords every day.
                 </div>
-                {/* image removed from Home */}
                 <div className="flex gap-3 mt-6">
                   <button onClick={() => setPage('FretBoard')} className={`${darkMode ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-indigo-500 hover:bg-indigo-600 text-white'} px-4 py-2 rounded-lg font-medium`}>
                     Open Fretboard
@@ -2311,7 +2163,6 @@
             {(page === 'Explorer' || page === 'FretBoard') && (
             <>
             <div className="w-full px-2 py-8 flex gap-1">
-              {/* Draw Controls Sidebar */}
               <div className={`${darkMode ? 'bg-[#1c1c1c]' : 'bg-white'} rounded-lg p-2 h-fit w-24`}>
                 <div className="flex flex-col gap-2">
                   <button
@@ -2385,9 +2236,7 @@
                       onBlur={(e)=> setBpm(Math.max(20, Math.min(300, parseInt(e.target.value) || 100)))}
                       className={`w-[72px] px-2 py-1 text-xs rounded ${darkMode ? 'bg-slate-800 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'} border`}
                     />
-                    {/* BPM label removed */}
                   </div>
-                  {/* Slider removed per request */}
                   <div className="flex gap-2 mt-2">
                     {!isMetronomeOn ? (
                       <button onClick={startMetronome} className={`${darkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} px-2 py-1 rounded text-xs font-medium w-full`}>Start</button>
@@ -2447,8 +2296,7 @@
                             const isRoot = isRootNote(noteIndex);
                             const degree = getScaleDegree(noteIndex);
                             const isHovered = hoveredNote === `${stringIndex}-${fretNum}`;
-                            
-                            // Only show frets in the selected range
+
                             if (fretNum < startFret || fretNum > endFret) return null;
 
                             const drawKey = `${stringIndex}-${fretNum}`;
@@ -2479,13 +2327,11 @@
                                   ></div>
                                 )}
 
-                                {/* Drawn note overlay */}
                                 {isDrawn && (
                                   <div className="absolute inset-0 border-4 border-yellow-400 rounded-lg pointer-events-none z-20" />
                                 )}
 
                                 {(() => {
-                                  // First check if chord is selected
                                   if (selectedChord) {
                                     const shouldShow = isToneInChord(noteIndex);
                                     if (!shouldShow) return null;
@@ -2556,12 +2402,12 @@
                 <div className="flex items-center justify-between mb-3">
                   <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>Saved Fretboard Notes</div>
                   <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Tap a saved set to load it onto the fretboard.
+                    Tap a saved set to load it.
                   </div>
                 </div>
                 {savedDrawings.length === 0 ? (
                   <div className={`${darkMode ? 'text-slate-400' : 'text-slate-600'} text-sm`}>
-                    No saved notes yet — draw on the fretboard, give it a name, and hit save.
+                    No saved notes. Draw, name it, then save.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -2645,7 +2491,6 @@
                         <div className="flex-1" />
                         <div className={`${darkMode ? 'text-slate-400' : 'text-slate-600'} text-xs`}>+50¢</div>
                       </div>
-                      {/* Green in-tune zone (±5¢) */}
                       <div className="absolute left-1/2 bottom-0 -translate-x-1/2 w-8 h-24 bg-green-500/25 rounded" />
                       <div className="absolute left-1/2 bottom-0 -translate-x-1/2 w-1 h-24 bg-indigo-600 origin-bottom rounded"
                         style={{ transform: `translateX(-50%) rotate(${(tunerCents / 50) * 45}deg)` }}
@@ -2659,7 +2504,6 @@
                       <div className={`mt-2 text-sm font-medium ${Math.abs(tunerCents) <= 5 ? 'text-green-500' : 'text-amber-500'}`}>
                         {Math.abs(tunerCents) <= 5 ? 'In tune' : tunerCents < 0 ? `${Math.abs(tunerCents)}¢ flat` : `${tunerCents}¢ sharp`}
                       </div>
-                      {/* Target string indicator with hold progress */}
                       <div className="mt-4 flex flex-col items-center gap-1">
                         <div className={`${darkMode ? 'text-slate-200' : 'text-slate-900'} text-sm font-semibold`}>
                           Target: {tuningPresets[tuning][selectedString]}
@@ -2675,7 +2519,6 @@
                       </div>
                     </div>
                   </div>
-                  {/* Right column: Headstock + Tuning */}
                   <div className="space-y-3">
                     <div className={`text-sm ${darkMode ? 'text-slate-200' : 'text-slate-900'} font-semibold`}>Tuning</div>
                     <select
@@ -2690,22 +2533,18 @@
 
                     <div className={`mt-2 ${darkMode ? 'bg-[#0f0f0f] border-[#2c2c2c]' : 'bg-slate-100 border-slate-300'} border rounded-lg p-3`}>
                       <div className={`text-xs mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Headstock</div>
-                      {/* Acoustic-style headstock: 3+3 tuners */}
                       <div className="relative w-72 h-44 mx-auto">
-                        {/* Wood headstock body */}
                         <div className={`absolute left-1/2 -translate-x-1/2 top-2 bottom-2 w-20 rounded-[24px] ${darkMode ? 'bg-[#2a1b10]' : 'bg-amber-800'} shadow-inner`} />
-                        {/* Nut */}
                         <div className={`${darkMode ? 'bg-slate-300' : 'bg-slate-200'} absolute left-1/2 -translate-x-1/2 bottom-2 h-1 w-24 rounded`} />
 
                         {(() => {
-                          // 3 pegs per side (left/right), bottom to top is low->high
                           const positions = [
                             { idx: 0, side: 'left', top: '76%' },
                             { idx: 1, side: 'left', top: '50%' },
                             { idx: 2, side: 'left', top: '24%' },
-                            { idx: 3, side: 'right', top: '24%' }, // G (top)
-                            { idx: 4, side: 'right', top: '50%' }, // B (middle)
-                            { idx: 5, side: 'right', top: '76%' }, // E (bottom)
+                            { idx: 3, side: 'right', top: '24%' },
+                            { idx: 4, side: 'right', top: '50%' },
+                            { idx: 5, side: 'right', top: '76%' },
                           ];
 
                           return positions.map((p) => {
@@ -2721,13 +2560,10 @@
                             const stringAnchorClass = p.side === 'left' ? 'left-[88px]' : 'right-[88px]';
                             return (
                               <div key={p.idx} className="absolute" style={{ top: p.top, left: 0, right: 0 }}>
-                                {/* String segment to nut */}
                                 <div className={`absolute ${stringAnchorClass} h-0.5 ${darkMode ? 'bg-slate-500' : 'bg-slate-400'} w-16`} />
-                                {/* Peg */}
                                 <div className={`absolute ${pegSideClass} -translate-y-1/2`}>
                                   <div className={`${darkMode ? 'bg-zinc-300' : 'bg-zinc-200'} w-4 h-4 rounded-full shadow`} />
                                 </div>
-                                {/* Clickable note label */}
                                 <button
                                   type="button"
                                   className={`absolute ${labelSideClass} -translate-y-1/2 px-2 py-0.5 text-xs rounded-full border ${pillClass}`}
@@ -2754,7 +2590,7 @@
             {page === 'About' && (
               <div className="container mx-auto px-4 py-12">
                 <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-2xl font-semibold mb-4`}>About</div>
-                <div className="text-white">Made by Nathan Kwon</div>
+                <div className={`${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Nathan Kwon</div>
               </div>
             )}
 
@@ -2762,7 +2598,6 @@
               <div className="container mx-auto px-4 py-12 max-w-5xl">
                 <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-2xl font-semibold mb-6`}>Jam Mode</div>
 
-                {/* Countdown Overlay */}
                 {isCountdownActive && countdown !== null && (
                   <div className="fixed inset-0 z-40 pointer-events-none flex items-center justify-center">
                     <div className={`text-[8rem] md:text-[10rem] font-extrabold drop-shadow ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
@@ -2772,7 +2607,6 @@
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* LEFT: Key + Progression */}
                   <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'} border rounded-lg p-4`}>
                     <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium mb-3`}>Key</div>
                     <select
@@ -2807,7 +2641,6 @@
                     )}
                   </div>
 
-                  {/* RIGHT: Metronome */}
                   <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'} border rounded-lg p-4`}>
                     <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium mb-3`}>Click Track</div>
                     <div className="flex items-center gap-3 mb-4">
@@ -2829,24 +2662,23 @@
                         {isMetronomeEnabled ? 'Disable' : 'Enable'}
                       </button>
                     </div>
-                    <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Countdown: 1 bar at {bpm} BPM (starts metronome when recording)</div>
+                    <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>1 bar countdown at {bpm} BPM</div>
                   </div>
                 </div>
 
                 <div className="mt-4 w-full max-w-2xl mx-auto text-center">
                   {isLoopProcessing && (
                     <div className={`text-sm font-medium ${darkMode ? 'text-amber-300' : 'text-amber-600'}`}>
-                      Auto-quantizing loop… aligning start/end and adding a soft crossfade.
+                      Quantizing…
                     </div>
                   )}
                   {!isLoopProcessing && loopQuantizeInfo && (
                     <div className={`text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                      Snapped to {loopQuantizeInfo.beats} beat{loopQuantizeInfo.beats === 1 ? '' : 's'} @ {loopQuantizeInfo.bpm} BPM ({loopQuantizeInfo.duration.toFixed(2)}s) with seamless edges.
+                      {loopQuantizeInfo.beats} beat{loopQuantizeInfo.beats === 1 ? '' : 's'} @ {loopQuantizeInfo.bpm} BPM
                     </div>
                   )}
                 </div>
 
-                {/* Bottom Center Controls */}
                 <div className="mt-8 flex flex-col items-center">
                   <button
                     onClick={() => (isRecording || isCountdownActive) ? stopRecording() : startRecording()}
@@ -2887,12 +2719,11 @@
                   </div>
                 </div>
 
-                {/* Trim UI (Waveform Editor) */}
                 {showCropUI && recordedAudio && (
                   <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'} border rounded-lg p-4 mt-6 max-w-3xl mx-auto w-full`}>
                     <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium mb-2`}>Trim</div>
                     <div className={`text-xs mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Drag the handles to remove audio from the beginning or end.
+                      Drag handles to trim.
                     </div>
 
                     <div className={`${darkMode ? 'bg-slate-900' : 'bg-slate-100'} rounded-md p-3 border ${darkMode ? 'border-slate-700' : 'border-slate-300'}`}>
@@ -2913,7 +2744,6 @@
                   </div>
                 )}
 
-                {/* Saved Loops */}
                 {savedLoops && savedLoops.length > 0 && (
                   <div className="mt-6 max-w-5xl mx-auto w-full">
                     <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium mb-2`}>Saved Loops</div>
@@ -2938,7 +2768,6 @@
               </div>
             )}
 
-            {/* Chords in Scale - hidden on Home, Tuner, About, and Jam Mode */}
             {page !== 'Home' && page !== 'Tuner' && page !== 'About' && page !== 'Jam Mode' && (
             <div className="container mx-auto px-4 py-8">
               <div className="mt-6">
@@ -2995,7 +2824,6 @@
       window.GuitarScaleExplorer = GuitarScaleExplorer;
     </script>
 
-    <!-- Mount the component with error handling -->
     <script type="text/babel">
       class ErrorBoundary extends React.Component {
         constructor(props) {
