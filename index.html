@@ -3,69 +3,186 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FretLab - Guitar Scale & Chord Explorer</title>
-    <meta name="description" content="FretLab – scales, chords, tuner, jam">
+    <title>FretLab — Guitar Scale & Chord Explorer</title>
+    <meta name="description" content="FretLab is an interactive guitar practice studio: explore scales and diatonic chords on a full 21-fret fretboard, tune up with the built-in chromatic tuner, and record quantized loops in Jam Mode." />
+    <meta name="theme-color" content="#151210" />
+    <meta property="og:title" content="FretLab — Guitar Scale & Chord Explorer" />
+    <meta property="og:description" content="Explore scales and chords on an interactive fretboard, tune your guitar, and record practice loops — all in the browser." />
+    <meta property="og:type" content="website" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23151210'/%3E%3Cpath d='M6 8h20M6 16h20M6 24h20' stroke='%236e6353' stroke-width='2'/%3E%3Ccircle cx='11' cy='16' r='4' fill='%23f59e0b'/%3E%3Ccircle cx='22' cy='24' r='4' fill='%23f5e9d0'/%3E%3C/svg%3E" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      :root { --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'; }
-      html, body { font-family: var(--font-sans); }
+      :root {
+        --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji';
+        --bg: #151210; --panel: #1d1915; --panel2: #26211b;
+        --border: #332b22; --border2: #453a2d;
+        --text: #efe7da; --muted: #a89a86; --faint: #6e6353;
+        --amber: #f59e0b; --amber2: #fbbf24; --cream: #f5e9d0;
+      }
+      html, body { font-family: var(--font-sans); background: var(--bg); color: var(--text); }
+      body {
+        background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(245, 158, 11, .06), transparent);
+        background-attachment: fixed;
+      }
+
+      /* Amp-room design system */
+      .fl-panel {
+        background: linear-gradient(180deg, var(--panel2), var(--panel));
+        border: 1px solid var(--border2); border-radius: 14px;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .04);
+      }
+      .fl-card { background: var(--panel); border: 1px solid var(--border2); border-radius: 12px; box-shadow: 0 3px 10px rgba(0, 0, 0, .3); }
+      .fl-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--faint); font-weight: 700; }
+      .fl-input { background: #141110; border: 1px solid var(--border2); color: var(--text); border-radius: 8px; outline: none; }
+      .fl-input:focus { border-color: var(--amber); }
+      .fl-btn { background: #141110; border: 1px solid var(--border2); color: var(--muted); border-radius: 8px; font-weight: 600; cursor: pointer; transition: color .15s, border-color .15s; }
+      .fl-btn:hover:not(:disabled) { color: var(--text); border-color: #5a4c39; }
+      .fl-btn:disabled { opacity: .45; cursor: not-allowed; }
+      .fl-btn-primary { background: linear-gradient(180deg, #fbbf24, #d97706); color: #2b1a05; border: 1px solid #b45309; border-radius: 8px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(245, 158, 11, .3); }
+      .fl-btn-primary:hover:not(:disabled) { filter: brightness(1.07); }
+      .fl-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+      .fl-btn-danger { background: linear-gradient(180deg, #f87356, #c2410c); color: #fff7ed; border: 1px solid #9a3412; border-radius: 8px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(194, 65, 12, .35); }
+      .fl-btn-danger:hover:not(:disabled) { filter: brightness(1.07); }
+      .fl-switch { display: inline-flex; border: 1px solid var(--border2); border-radius: 20px; overflow: hidden; background: #141110; }
+      .fl-switch button { border: none; background: transparent; color: var(--muted); font-weight: 600; cursor: pointer; font-family: inherit; }
+      .fl-switch button.on { background: var(--amber); color: #2b1a05; }
+
+      .rail-btn { color: var(--faint); border-radius: 10px; position: relative; transition: color .15s, background .15s; }
+      .rail-btn:hover { background: #1d1813; color: var(--muted); }
+      .rail-btn.active { background: #241d14; color: var(--amber2); }
+      .rail-btn.active::before { content: ''; position: absolute; left: -10px; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: var(--amber); box-shadow: 0 0 8px rgba(245, 158, 11, .6); }
+      .brand-mark { background: radial-gradient(circle at 35% 30%, #fbbf24, #b45309); box-shadow: inset 0 -2px 5px rgba(0, 0, 0, .4), 0 0 14px rgba(245, 158, 11, .35); }
+      .led { width: 9px; height: 9px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 8px rgba(74, 222, 128, .7); }
+      .led.rec { background: #f87171; box-shadow: 0 0 8px rgba(248, 113, 113, .8); }
+
+      .wood { background: linear-gradient(180deg, #43301f 0%, #38271a 30%, #2e2015 70%, #271b12 100%); box-shadow: inset 0 2px 8px rgba(0, 0, 0, .5); }
+      .fret-wire { background: linear-gradient(90deg, #c9a45e, #7d6236); box-shadow: 1px 0 2px rgba(0, 0, 0, .5); }
+      .string-metal { background: linear-gradient(180deg, #e8dcc0, #8f8468); box-shadow: 0 1px 2px rgba(0, 0, 0, .6); }
+      .inlay-pearl { background: radial-gradient(circle at 35% 30%, #fdf6e3, #b9ab8d); opacity: .5; }
+      .note-root-glow { box-shadow: 0 0 12px rgba(245, 158, 11, .55), 0 2px 6px rgba(0, 0, 0, .5) !important; }
+
+      .knob { border-radius: 50%; background: radial-gradient(circle at 35% 30%, #4a3f31, #241d15); border: 1px solid var(--border2); box-shadow: inset 0 2px 4px rgba(255, 255, 255, .06), 0 3px 8px rgba(0, 0, 0, .5); position: relative; }
+      .knob-needle { position: absolute; top: 4px; left: 50%; width: 3px; height: 12px; background: var(--amber2); border-radius: 2px; transform-origin: 50% 18px; box-shadow: 0 0 5px rgba(251, 191, 36, .7); }
+
+      .screw { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #7a6c56, #3a3128); }
     </style>
   </head>
   <body class="antialiased">
     <div id="root"></div>
 
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
 
     <script type="text/babel" data-presets="env,react">
       const { useState, useMemo } = React;
 
-      const Sun = ({ size = 20 }) => (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width={size}
-          height={size}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="12" cy="12" r="4"></circle>
-          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
-        </svg>
-      );
+      // ---- Static music data ----
+      const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
-      const Moon = ({ size = 20 }) => (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width={size}
-          height={size}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-        </svg>
+      const strings = [
+        { name: 'e', openNote: 4 },
+        { name: 'B', openNote: 11 },
+        { name: 'G', openNote: 7 },
+        { name: 'D', openNote: 2 },
+        { name: 'A', openNote: 9 },
+        { name: 'E', openNote: 4 }
+      ];
+
+      const scales = {
+        major: [0, 2, 4, 5, 7, 9, 11],
+        minor: [0, 2, 3, 5, 7, 8, 10],
+        pentatonicMajor: [0, 2, 4, 7, 9],
+        pentatonicMinor: [0, 3, 5, 7, 10],
+        blues: [0, 3, 5, 6, 7, 10],
+        dorian: [0, 2, 3, 5, 7, 9, 10],
+        phrygian: [0, 1, 3, 5, 7, 8, 10],
+        lydian: [0, 2, 4, 6, 7, 9, 11],
+        mixolydian: [0, 2, 4, 5, 7, 9, 10],
+        locrian: [0, 1, 3, 5, 6, 8, 10],
+        harmonicMinor: [0, 2, 3, 5, 7, 8, 11],
+        melodicMinor: [0, 2, 3, 5, 7, 9, 11]
+      };
+
+      const scaleNames = {
+        major: 'Major',
+        minor: 'Natural Minor',
+        pentatonicMajor: 'Pentatonic Major',
+        pentatonicMinor: 'Pentatonic Minor',
+        blues: 'Blues',
+        dorian: 'Dorian',
+        phrygian: 'Phrygian',
+        lydian: 'Lydian',
+        mixolydian: 'Mixolydian',
+        locrian: 'Locrian',
+        harmonicMinor: 'Harmonic Minor',
+        melodicMinor: 'Melodic Minor'
+      };
+
+      const tuningPresets = {
+        standard: ['E', 'A', 'D', 'G', 'B', 'E'],
+        dropD: ['D', 'A', 'D', 'G', 'B', 'E'],
+        halfStepDown: ['D#', 'G#', 'C#', 'F#', 'A#', 'D#'],
+      };
+
+      const chordProgressions = [
+        { name: 'I-V-vi-IV', romans: ['I', 'V', 'vi', 'IV'] },
+        { name: 'I-vi-IV-V', romans: ['I', 'vi', 'IV', 'V'] },
+        { name: 'vi-IV-I-V', romans: ['vi', 'IV', 'I', 'V'] },
+        { name: 'I-V-IV-I', romans: ['I', 'V', 'IV', 'I'] },
+        { name: 'ii-V-I', romans: ['ii', 'V', 'I'] },
+        { name: 'Custom', romans: [] },
+      ];
+
+      const RailIcon = ({ children }) => (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>
       );
+      const IconHome = () => <RailIcon><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></RailIcon>;
+      const IconFret = () => <RailIcon><path d="M3 6h18M3 12h18M3 18h18M8 3v18M16 3v18" /></RailIcon>;
+      const IconTuner = () => <RailIcon><path d="M12 3v10M12 13a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM8 5l4-2 4 2" /></RailIcon>;
+      const IconJam = () => <RailIcon><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" /></RailIcon>;
+      const IconInfo = () => <RailIcon><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M12 12v4" /></RailIcon>;
+
+      const Knob = ({ value, min, max }) => {
+        const clamped = Math.max(min, Math.min(max, value));
+        const angle = -135 + ((clamped - min) / (max - min)) * 270;
+        return (
+          <div className="knob" style={{ width: 44, height: 44 }}>
+            <div className="knob-needle" style={{ transform: `translateX(-50%) rotate(${angle}deg)` }} />
+          </div>
+        );
+      };
+
+      const isLightColor = (hex) => {
+        if (!hex || hex[0] !== '#' || hex.length < 7) return false;
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return 0.299 * r + 0.587 * g + 0.114 * b > 150;
+      };
+
+      const romanForChord = (chord) => {
+        const base = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][chord.degree - 1] || '';
+        const q = chord.quality || '';
+        const minorish = q === 'm' || q === 'm7' || q === 'dim' || q === 'dim7' || q === 'm7b5';
+        let roman = minorish ? base.toLowerCase() : base;
+        if (q === 'dim' || q === 'dim7') roman += '°';
+        if (q === 'm7b5') roman += 'ø';
+        return roman;
+      };
 
       const GuitarScaleExplorer = () => {
         const [rootNote, setRootNote] = useState('C');
         const [scaleType, setScaleType] = useState('major');
         const [showDegrees, setShowDegrees] = useState(false);
-        const [darkMode, setDarkMode] = useState(true);
         const [hoveredNote, setHoveredNote] = useState(null);
-        const [rootColor, setRootColor] = useState('#ef4444');
-        const [noteColor, setNoteColor] = useState('#3b82f6');
-        const [thirdColor, setThirdColor] = useState('#10b981');
+        const [rootColor, setRootColor] = useState('#f59e0b');
+        const [noteColor, setNoteColor] = useState('#f5e9d0');
+        const [thirdColor, setThirdColor] = useState('#d96d2f');
         const [chordType, setChordType] = useState('triads');
         const [selectedChord, setSelectedChord] = useState(null);
         const [startFret, setStartFret] = useState(1);
@@ -73,9 +190,7 @@
         const [drawingMode, setDrawingMode] = useState(null);
         const [drawings, setDrawings] = useState({});
         const [savedDrawings, setSavedDrawings] = useState([]);
-        const [isSidebarOpen, setIsSidebarOpen] = useState(false);
         const [page, setPage] = useState('Home');
-        const imgVersion = useMemo(() => Date.now(), []);
 
         const [bpm, setBpm] = useState(100);
         const [isMetronomeOn, setIsMetronomeOn] = useState(false);
@@ -147,15 +262,7 @@
           buf: null,
         });
 
-        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
         const [tuning, setTuning] = useState('standard');
-        const tuningPresets = {
-          standard: ['E', 'A', 'D', 'G', 'B', 'E'],
-          dropD: ['D', 'A', 'D', 'G', 'B', 'E'],
-          halfStepDown: ['D#', 'G#', 'C#', 'F#', 'A#', 'D#'],
-        };
-
         const [selectedString, setSelectedString] = useState(0);
         const [stringHoldStart, setStringHoldStart] = useState(null);
         const [stringConfirmed, setStringConfirmed] = useState(false);
@@ -236,23 +343,10 @@
           playbackRef.current.time = playbackTime;
         }, [playbackTime]);
 
-        const musicalKeys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
-        const chordProgressions = [
-          { name: 'I-V-vi-IV', romans: ['I', 'V', 'vi', 'IV'] },
-          { name: 'I-vi-IV-V', romans: ['I', 'vi', 'IV', 'V'] },
-          { name: 'vi-IV-I-V', romans: ['vi', 'IV', 'I', 'V'] },
-          { name: 'I-V-IV-I', romans: ['I', 'V', 'IV', 'I'] },
-          { name: 'ii-V-I', romans: ['ii', 'V', 'I'] },
-          { name: 'Custom', romans: [] },
-        ];
-
         const scaleNotesMajor = (root) => {
-          const all = musicalKeys;
-          const idx = all.indexOf(root);
+          const idx = noteNames.indexOf(root);
           if (idx < 0) return [];
-          const majorSteps = [0, 2, 4, 5, 7, 9, 11];
-          return majorSteps.map(semi => all[(idx + Math.round(semi/1)) % all.length]);
+          return scales.major.map(semi => noteNames[(idx + semi) % noteNames.length]);
         };
 
         const romanToChordInKey = (key, roman) => {
@@ -878,10 +972,10 @@
           const mid = Math.floor(height / 2);
           ctx.clearRect(0, 0, width, height);
 
-          ctx.fillStyle = darkMode ? '#0f172a' : '#f1f5f9';
+          ctx.fillStyle = '#141110';
           ctx.fillRect(0, 0, width, height);
 
-          ctx.strokeStyle = darkMode ? '#334155' : '#94a3b8';
+          ctx.strokeStyle = '#453a2d';
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(0, mid);
@@ -900,8 +994,8 @@
                 const x = Math.round((t / audioDuration) * width);
                 const isDownbeat = Math.abs((t / beatSeconds) - Math.round(t / beatSeconds)) < 0.01;
                 ctx.strokeStyle = isDownbeat
-                  ? (darkMode ? '#4ade80' : '#22c55e')
-                  : (darkMode ? '#475569' : '#cbd5f5');
+                  ? ('#fbbf24')
+                  : ('#4a3e2e');
                 ctx.lineWidth = isDownbeat ? 1.5 : 0.5;
                 ctx.beginPath();
                 ctx.moveTo(x, 0);
@@ -911,7 +1005,7 @@
             }
           }
 
-          ctx.strokeStyle = darkMode ? '#38bdf8' : '#0ea5e9';
+          ctx.strokeStyle = '#d9a441';
           ctx.lineWidth = 1;
           ctx.beginPath();
           for (let x = 0; x < width; x++) {
@@ -935,22 +1029,21 @@
           const selX1 = toX(Math.max(0, Math.min(audioDuration, currentStart)));
           const selX2 = toX(Math.max(0, Math.min(audioDuration, currentEnd)));
 
-          ctx.fillStyle = darkMode ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.15)';
+          ctx.fillStyle = 'rgba(0,0,0,0.45)';
           ctx.fillRect(0, 0, selX1, height);
           ctx.fillRect(selX2, 0, width - selX2, height);
 
-          ctx.fillStyle = darkMode ? 'rgba(34,197,94,0.25)' : 'rgba(34,197,94,0.2)';
+          ctx.fillStyle = 'rgba(245,158,11,0.16)';
           ctx.fillRect(selX1, 0, Math.max(2, selX2 - selX1), height);
 
-          ctx.strokeStyle = darkMode ? '#22c55e' : '#16a34a';
+          ctx.strokeStyle = '#f59e0b';
           ctx.lineWidth = 2;
           ctx.strokeRect(selX1, 0, Math.max(2, selX2 - selX1), height);
 
           const handleWidth = 8;
-          const handleHitWidth = 20;
-          ctx.fillStyle = darkMode ? '#22c55e' : '#16a34a';
+          ctx.fillStyle = '#f59e0b';
           ctx.fillRect(selX1 - handleWidth / 2, 0, handleWidth, height);
-          ctx.strokeStyle = darkMode ? '#16a34a' : '#15803d';
+          ctx.strokeStyle = '#b45309';
           ctx.lineWidth = 2;
           for (let i = 0; i < 3; i++) {
             const yPos = (height / 4) * (i + 1);
@@ -959,9 +1052,9 @@
             ctx.lineTo(selX1 + handleWidth / 2 - 2, yPos);
             ctx.stroke();
           }
-          ctx.fillStyle = darkMode ? '#22c55e' : '#16a34a';
+          ctx.fillStyle = '#f59e0b';
           ctx.fillRect(selX2 - handleWidth / 2, 0, handleWidth, height);
-          ctx.strokeStyle = darkMode ? '#16a34a' : '#15803d';
+          ctx.strokeStyle = '#b45309';
           for (let i = 0; i < 3; i++) {
             const yPos = (height / 4) * (i + 1);
             ctx.beginPath();
@@ -1005,10 +1098,10 @@
             const mid = Math.floor(height / 2);
             ctx.clearRect(0, 0, width, height);
 
-            ctx.fillStyle = darkMode ? '#0f172a' : '#f1f5f9';
+            ctx.fillStyle = '#141110';
             ctx.fillRect(0, 0, width, height);
 
-            ctx.strokeStyle = darkMode ? '#334155' : '#94a3b8';
+            ctx.strokeStyle = '#453a2d';
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(0, mid);
@@ -1019,7 +1112,7 @@
             const channelData = buffer.getChannelData(0);
             const samplesPerPixel = Math.max(1, Math.floor(channelData.length / width));
 
-            ctx.strokeStyle = darkMode ? '#38bdf8' : '#0ea5e9';
+            ctx.strokeStyle = '#d9a441';
             ctx.lineWidth = 1;
             ctx.beginPath();
             for (let x = 0; x < width; x++) {
@@ -1046,14 +1139,14 @@
             const selX1 = toX(Math.max(0, Math.min(currentDuration, currentStart)));
             const selX2 = toX(Math.max(0, Math.min(currentDuration, currentEnd)));
 
-            ctx.fillStyle = darkMode ? 'rgba(239,68,68,0.25)' : 'rgba(239,68,68,0.15)';
+            ctx.fillStyle = 'rgba(0,0,0,0.45)';
             ctx.fillRect(0, 0, selX1, height);
             ctx.fillRect(selX2, 0, width - selX2, height);
 
-            ctx.fillStyle = darkMode ? 'rgba(34,197,94,0.25)' : 'rgba(34,197,94,0.2)';
+            ctx.fillStyle = 'rgba(245,158,11,0.16)';
             ctx.fillRect(selX1, 0, Math.max(2, selX2 - selX1), height);
 
-            ctx.strokeStyle = darkMode ? '#22c55e' : '#16a34a';
+            ctx.strokeStyle = '#f59e0b';
             ctx.lineWidth = 2;
             ctx.strokeRect(selX1, 0, Math.max(2, selX2 - selX1), height);
 
@@ -1063,10 +1156,10 @@
               const playbackClamped = Math.max(0, Math.min(safeDuration, playbackPos));
               const playbackX = toX(playbackClamped);
 
-              ctx.fillStyle = '#000000';
+              ctx.fillStyle = '#f5e9d0';
               ctx.fillRect(playbackX - 2, 0, 4, height);
 
-              ctx.fillStyle = '#000000';
+              ctx.fillStyle = '#f5e9d0';
               ctx.beginPath();
               ctx.moveTo(playbackX - 6, 0);
               ctx.lineTo(playbackX + 6, 0);
@@ -1076,9 +1169,9 @@
             }
 
             const handleWidth = 8;
-            ctx.fillStyle = darkMode ? '#22c55e' : '#16a34a';
+            ctx.fillStyle = '#f59e0b';
             ctx.fillRect(selX1 - handleWidth / 2, 0, handleWidth, height);
-            ctx.strokeStyle = darkMode ? '#16a34a' : '#15803d';
+            ctx.strokeStyle = '#b45309';
             ctx.lineWidth = 2;
             for (let i = 0; i < 3; i++) {
               const yPos = (height / 4) * (i + 1);
@@ -1087,9 +1180,9 @@
               ctx.lineTo(selX1 + handleWidth / 2 - 2, yPos);
               ctx.stroke();
             }
-            ctx.fillStyle = darkMode ? '#22c55e' : '#16a34a';
+            ctx.fillStyle = '#f59e0b';
             ctx.fillRect(selX2 - handleWidth / 2, 0, handleWidth, height);
-            ctx.strokeStyle = darkMode ? '#16a34a' : '#15803d';
+            ctx.strokeStyle = '#b45309';
             for (let i = 0; i < 3; i++) {
               const yPos = (height / 4) * (i + 1);
               ctx.beginPath();
@@ -1295,7 +1388,7 @@
             window.removeEventListener('touchend', onUp);
             window.removeEventListener('touchcancel', onUp);
           };
-        }, [showCropUI, recordedAudio, audioDuration, darkMode, bpm]);
+        }, [showCropUI, recordedAudio, audioDuration, bpm]);
 
         React.useEffect(() => {
           if (showCropUI && jamModeRef.current.audioBuffer) {
@@ -1305,7 +1398,7 @@
             }
             drawWaveform();
           }
-        }, [showCropUI, cropStart, cropEnd, audioDuration, darkMode, playbackTime, bpm]);
+        }, [showCropUI, cropStart, cropEnd, audioDuration, playbackTime, bpm]);
 
         React.useEffect(() => {
           if (!isPlaying || !showCropUI) return;
@@ -1394,8 +1487,6 @@
           const names = tuningPresets[presetKey];
           if (!names) return [];
           const octaves = [...baseOctavesStandard];
-          if (presetKey === 'dropD') octaves[0] = 2;
-          if (presetKey === 'halfStepDown') {}
           return names.map((n, i) => {
             const midi = noteNameToMidi(n, octaves[i]);
             return midi != null ? midiToFreq(midi) : null;
@@ -1496,9 +1587,7 @@
           const baseOctavesStandard = [2,2,3,3,3,4];
           const names = tuningPresets[presetKey];
           if (!names || idx < 0 || idx >= names.length) return null;
-          const octaves = [...baseOctavesStandard];
-          if (presetKey === 'dropD') octaves[0] = 2;
-          return { name: names[idx], octave: octaves[idx] };
+          return { name: names[idx], octave: baseOctavesStandard[idx] };
         };
         const playStringSample = async (idx) => {
           try {
@@ -1506,8 +1595,7 @@
             sampleRef.current.audioCtx = ctx;
             const info = getStringNameAndOctave(tuning, idx);
             if (!info) throw new Error('no note info');
-            const tuningFolderMap = { standard: 'standard', dropD: 'dropD', halfStepDown: 'halfStepDown' };
-            const folder = tuningFolderMap[tuning] || 'standard';
+            const folder = tuning in tuningPresets ? tuning : 'standard';
             const fileBase = `assets/samples/${folder}/${encodeURIComponent(info.name + info.octave)}`;
             const tryUrls = [`${fileBase}.mp3`, `${fileBase}.wav`];
             let buffer = null;
@@ -1736,47 +1824,6 @@
           setTunerCents(0);
         };
 
-        const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-        
-        const strings = [
-          { name: 'e', openNote: 4 },
-          { name: 'B', openNote: 11 },
-          { name: 'G', openNote: 7 },
-          { name: 'D', openNote: 2 },
-          { name: 'A', openNote: 9 },
-          { name: 'E', openNote: 4 }
-        ];
-
-        const scales = {
-          major: [0, 2, 4, 5, 7, 9, 11],
-          minor: [0, 2, 3, 5, 7, 8, 10],
-          pentatonicMajor: [0, 2, 4, 7, 9],
-          pentatonicMinor: [0, 3, 5, 7, 10],
-          blues: [0, 3, 5, 6, 7, 10],
-          dorian: [0, 2, 3, 5, 7, 9, 10],
-          phrygian: [0, 1, 3, 5, 7, 8, 10],
-          lydian: [0, 2, 4, 6, 7, 9, 11],
-          mixolydian: [0, 2, 4, 5, 7, 9, 10],
-          locrian: [0, 1, 3, 5, 6, 8, 10],
-          harmonicMinor: [0, 2, 3, 5, 7, 8, 11],
-          melodicMinor: [0, 2, 3, 5, 7, 9, 11]
-        };
-
-        const scaleNames = {
-          major: 'Major',
-          minor: 'Natural Minor',
-          pentatonicMajor: 'Pentatonic Major',
-          pentatonicMinor: 'Pentatonic Minor',
-          blues: 'Blues',
-          dorian: 'Dorian',
-          phrygian: 'Phrygian',
-          lydian: 'Lydian',
-          mixolydian: 'Mixolydian',
-          locrian: 'Locrian',
-          harmonicMinor: 'Harmonic Minor',
-          melodicMinor: 'Melodic Minor'
-        };
-
         const handleSaveDrawing = () => {
           const hasMarks = drawings && Object.keys(drawings).length > 0;
           if (!hasMarks) {
@@ -1814,7 +1861,7 @@
         };
 
         const getScaleNotes = useMemo(() => {
-          const rootIndex = notes.indexOf(rootNote);
+          const rootIndex = noteNames.indexOf(rootNote);
           const intervals = scales[scaleType];
           return intervals.map(interval => (rootIndex + interval) % 12);
         }, [rootNote, scaleType]);
@@ -1850,7 +1897,7 @@
         };
 
         const isRootNote = (noteIndex) => {
-          return noteIndex % 12 === notes.indexOf(rootNote);
+          return noteIndex % 12 === noteNames.indexOf(rootNote);
         };
 
         const isToneInChord = (noteIndex) => {
@@ -1898,7 +1945,7 @@
             const chordPcs = stack.map(step => rotated[step % rotated.length]);
             const rootPc = chordPcs[0];
             const intervals = chordPcs.map(pc => pcDistance(rootPc, pc));
-            const rootName = notes[rootPc];
+            const rootName = noteNames[rootPc];
             const quality = chordType === 'sevenths' ? intervalsToQualitySeventh(intervals) : intervalsToQualityTriad(intervals);
             chords.push({
               name: `${rootName}${quality}`,
@@ -1914,909 +1961,751 @@
         const hasActiveDrawing = drawings && Object.keys(drawings).length > 0;
 
         return (
-          <div className={`min-h-screen ${darkMode ? 'bg-[#121212]' : 'bg-gray-100'} transition-colors duration-300`}>
-            <div className={`${darkMode ? 'bg-[#1c1c1c] border-[#2c2c2c]' : 'bg-white border-gray-200'} border-b`}>
-            
-              <div className="container mx-auto px-4 py-4">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setIsSidebarOpen(true)}
-                      className={`h-10 w-10 grid place-items-center rounded-lg transition-colors ${
-                        darkMode ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
-                      }`}
-                      title="Open Menu"
-                    >
-                      ☰
-                    </button>
-                  <h1 className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
-                    FretLab
-                  </h1>
-                  </div>
-                  
-                {(page === 'Explorer' || page === 'FretBoard') && (
-                  <div className="flex flex-wrap items-end gap-4">
-                    <div className="flex items-end gap-3">
-                    <div className="flex flex-col">
-                      <label className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        Root Note
-                      </label>
-                      <select
-                        value={rootNote}
-                        onChange={(e) => setRootNote(e.target.value)}
-                        className={`px-3 h-10 text-sm rounded-lg ${
-                          darkMode 
-                            ? 'bg-slate-800 text-white border-slate-600' 
-                            : 'bg-white text-slate-900 border-slate-300'
-                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                      >
-                        {notes.map(note => (
-                          <option key={note} value={note}>{note}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex flex-col">
-                      <label className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          Scale Type
-                      </label>
-                      <select
-                          value={scaleType}
-                          onChange={(e) => setScaleType(e.target.value)}
-                        className={`px-3 h-10 text-sm rounded-lg ${
-                          darkMode 
-                            ? 'bg-slate-800 text-white border-slate-600' 
-                            : 'bg-white text-slate-900 border-slate-300'
-                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                      >
-                          {Object.entries(scaleNames).map(([key, name]) => (
-                            <option key={key} value={key}>{name}</option>
-                          ))}
-                      </select>
-                      </div>
-                    </div>
+          <div className="min-h-screen">
+            {/* Icon rail navigation */}
+            <nav className="fixed top-0 bottom-0 left-0 w-16 bg-[#0f0d0b] border-r border-[#332b22] flex flex-col items-center py-4 gap-1.5 z-40">
+              <div className="brand-mark w-9 h-9 rounded-full grid place-items-center text-[#2b1a05] font-black text-[13px] mb-3 select-none">
+                FL
+              </div>
+              {[
+                { key: 'Home', label: 'Home', Icon: IconHome },
+                { key: 'FretBoard', label: 'Fretboard', Icon: IconFret },
+                { key: 'Tuner', label: 'Tuner', Icon: IconTuner },
+                { key: 'Jam Mode', label: 'Jam Mode', Icon: IconJam },
+              ].map(({ key, label, Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => setPage(key)}
+                  className={`rail-btn w-11 h-11 grid place-items-center ${page === key ? 'active' : ''}`}
+                  title={label}
+                  aria-label={label}
+                >
+                  <Icon />
+                </button>
+              ))}
+              <div className="flex-1" />
+              <button
+                onClick={() => setPage('About')}
+                className={`rail-btn w-11 h-11 grid place-items-center ${page === 'About' ? 'active' : ''}`}
+                title="About"
+                aria-label="About"
+              >
+                <IconInfo />
+              </button>
+            </nav>
 
-                    <div className="flex flex-col">
-                      <label className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        Chords
-                      </label>
-                      <select
-                        value={chordType}
-                        onChange={(e) => setChordType(e.target.value)}
-                        className={`px-3 h-10 text-sm rounded-lg ${
-                          darkMode 
-                            ? 'bg-slate-800 text-white border-slate-600' 
-                            : 'bg-white text-slate-900 border-slate-300'
-                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+            <div className="ml-16">
+              {/* Top bar */}
+              <header className="h-14 flex items-center justify-between px-7 border-b border-[#332b22] bg-[#151210]/90">
+                <div className="flex items-baseline gap-2.5">
+                  <span className="font-extrabold text-[15px] tracking-tight">FretLab</span>
+                  <span className="text-[#6e6353]">/</span>
+                  <span className="text-[#a89a86] text-sm">{page === 'FretBoard' ? 'Fretboard' : page}</span>
+                </div>
+                <div className="flex items-center gap-5">
+                  {page === 'FretBoard' && (
+                    <div className="flex items-center gap-2 fl-card px-3.5 py-1.5 text-[13px] text-[#a89a86]">
+                      <span className="w-2 h-2 rounded-full bg-[#f59e0b] shadow-[0_0_8px_rgba(245,158,11,.7)]" />
+                      Current scale <b className="text-[#efe7da] font-semibold">{rootNote} {scaleNames[scaleType]}</b>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <span className={`led ${isRecording ? 'rec' : ''}`} />
+                    <span className="text-[11px] text-[#6e6353] uppercase tracking-widest font-bold">
+                      {isRecording ? 'Rec' : 'Ready'}
+                    </span>
+                  </div>
+                </div>
+              </header>
+
+              {/* ---------------- Home ---------------- */}
+              {page === 'Home' && (
+                <div className="max-w-5xl mx-auto px-8">
+                  <div className="pt-20 pb-11 text-center">
+                    <div className="inline-flex items-center gap-2 fl-card rounded-full px-4 py-1.5 text-[#fbbf24] text-xs font-bold tracking-widest uppercase mb-7">
+                      <span className="led" /> Plugged in &amp; ready
+                    </div>
+                    <h1 className="text-5xl md:text-[52px] font-black tracking-tight leading-[1.05] mb-4">
+                      Your practice room,<br />
+                      <em className="not-italic text-[#fbbf24] [text-shadow:0_0_24px_rgba(245,158,11,.4)]">always open.</em>
+                    </h1>
+                    <p className="text-[#a89a86] text-[17px] leading-relaxed max-w-xl mx-auto">
+                      FretLab puts a full fretboard atlas, a chromatic tuner, and a loop recorder on one
+                      workbench — so every practice session starts in seconds, right in the browser.
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-3 mt-8">
+                      <button onClick={() => setPage('FretBoard')} className="fl-btn-primary h-11 px-7 rounded-[10px] text-[15px]">
+                        Open Fretboard
+                      </button>
+                      <button onClick={() => setPage('Tuner')} className="fl-btn h-11 px-7 rounded-[10px] text-[15px]">
+                        Tune Up
+                      </button>
+                      <button onClick={() => setPage('Jam Mode')} className="fl-btn h-11 px-7 rounded-[10px] text-[15px]">
+                        Jam
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-14">
+                    {[
+                      { glyph: '▦', title: 'Fretboard Explorer', page: 'FretBoard',
+                        text: 'Every scale, mode, and diatonic chord mapped across 21 frets. Toggle degrees, draw your own patterns, save them for later.' },
+                      { glyph: '◉', title: 'Chromatic Tuner', page: 'Tuner',
+                        text: 'Mic-based pitch detection with auto string detect and reference tones. Standard, Drop D, and half-step down presets.' },
+                      { glyph: '◎', title: 'Jam Mode', page: 'Jam Mode',
+                        text: 'Record over a click track with a one-bar count-in. Loops are quantized to the grid and saved right in your browser.' },
+                    ].map((card) => (
+                      <button
+                        key={card.title}
+                        onClick={() => setPage(card.page)}
+                        className="fl-panel relative p-6 pt-7 text-left cursor-pointer hover:brightness-110 transition"
                       >
+                        <span className="screw" style={{ top: 10, left: 10 }} />
+                        <span className="screw" style={{ top: 10, right: 10 }} />
+                        <span className="screw" style={{ bottom: 10, left: 10 }} />
+                        <span className="screw" style={{ bottom: 10, right: 10 }} />
+                        <div className="text-[17px] font-extrabold text-[#f5e9d0] mb-2">
+                          <span className="text-[#fbbf24] mr-2">{card.glyph}</span>{card.title}
+                        </div>
+                        <p className="text-[#a89a86] text-[13.5px] leading-relaxed">{card.text}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ---------------- Fretboard ---------------- */}
+              {page === 'FretBoard' && (
+                <div className="px-6 py-6 max-w-[1400px] mx-auto">
+                  {/* Control deck */}
+                  <div className="fl-panel flex flex-wrap items-end gap-x-5 gap-y-4 px-5 py-4 mb-5">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="fl-label">Root note</label>
+                      <select value={rootNote} onChange={(e) => setRootNote(e.target.value)} className="fl-input h-9 px-3 text-sm">
+                        {noteNames.map(note => <option key={note} value={note}>{note}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="fl-label">Scale</label>
+                      <select value={scaleType} onChange={(e) => setScaleType(e.target.value)} className="fl-input h-9 px-3 text-sm">
+                        {Object.entries(scaleNames).map(([key, name]) => <option key={key} value={key}>{name}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="fl-label">Chords</label>
+                      <select value={chordType} onChange={(e) => setChordType(e.target.value)} className="fl-input h-9 px-3 text-sm">
                         <option value="triads">Triads</option>
                         <option value="sevenths">Sevenths</option>
                       </select>
                     </div>
-
-                    <div className="flex flex-col">
-                      <label className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        Root Color
-                      </label>
-                      <input
-                        type="color"
-                        value={rootColor}
-                        onChange={(e) => setRootColor(e.target.value)}
-                        className={`h-10 w-16 rounded border ${darkMode ? 'border-slate-600 bg-slate-800' : 'border-slate-300 bg-white'}`}
-                        aria-label="Pick root note color"
-                      />
+                    <div className="flex flex-col gap-1.5">
+                      <label className="fl-label">Root color</label>
+                      <input type="color" value={rootColor} onChange={(e) => setRootColor(e.target.value)}
+                        className="fl-input h-9 w-12 p-1 cursor-pointer" aria-label="Pick root note color" />
                     </div>
-
-                    <div className="flex flex-col">
-                      <label className={`text-xs mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        Note Color
-                      </label>
-                      <input
-                        type="color"
-                        value={noteColor}
-                        onChange={(e) => setNoteColor(e.target.value)}
-                        className={`h-10 w-16 rounded border ${darkMode ? 'border-slate-600 bg-slate-800' : 'border-slate-300 bg-white'}`}
-                        aria-label="Pick scale note color"
-                      />
+                    <div className="flex flex-col gap-1.5">
+                      <label className="fl-label">Note color</label>
+                      <input type="color" value={noteColor} onChange={(e) => setNoteColor(e.target.value)}
+                        className="fl-input h-9 w-12 p-1 cursor-pointer" aria-label="Pick scale note color" />
                     </div>
-
-                    <button
-                      onClick={() => setShowDegrees(!showDegrees)}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        darkMode
-                          ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                          : 'bg-indigo-500 hover:bg-indigo-600 text-white'
-                      }`}
-                    >
-                      {showDegrees ? 'Show Notes' : 'Show Degrees'}
-                    </button>
-
-                    <div className="flex flex-col gap-1">
-                      <label className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        Frets
-                      </label>
-                      <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="fl-label">Display</label>
+                      <div className="fl-switch h-9 items-center">
+                        <button className={`px-4 h-full text-[12.5px] ${!showDegrees ? 'on' : ''}`} onClick={() => setShowDegrees(false)}>Notes</button>
+                        <button className={`px-4 h-full text-[12.5px] ${showDegrees ? 'on' : ''}`} onClick={() => setShowDegrees(true)}>Degrees</button>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="fl-label">Frets</label>
+                      <div className="flex items-center gap-1.5">
                         <input
-                          type="number"
-                          min="1"
-                          max="21"
-                          value={startFret}
+                          type="number" min="1" max="21" value={startFret}
                           onChange={(e) => {
                             const val = Math.max(1, Math.min(20, parseInt(e.target.value) || 1));
                             setStartFret(val);
                             if (val >= endFret) setEndFret(Math.min(21, val + 1));
                           }}
-                          className={`w-16 px-2 py-1 text-sm rounded ${
-                            darkMode 
-                              ? 'bg-slate-800 text-white border-slate-600' 
-                              : 'bg-white text-slate-900 border-slate-300'
-                          } border`}
+                          className="fl-input h-9 w-14 px-2 text-sm"
                         />
-                        <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>-</span>
+                        <span className="text-[#6e6353]">–</span>
                         <input
-                          type="number"
-                          min="1"
-                          max="21"
-                          value={endFret}
+                          type="number" min="1" max="21" value={endFret}
                           onChange={(e) => {
                             const val = Math.max(2, Math.min(21, parseInt(e.target.value) || 21));
                             setEndFret(val);
                             if (val <= startFret) setStartFret(Math.max(1, val - 1));
                           }}
-                          className={`w-16 px-2 py-1 text-sm rounded ${
-                            darkMode 
-                              ? 'bg-slate-800 text-white border-slate-600' 
-                              : 'bg-white text-slate-900 border-slate-300'
-                          } border`}
+                          className="fl-input h-9 w-14 px-2 text-sm"
                         />
-                        <button
-                          onClick={() => {
-                            setStartFret(1);
-                            setEndFret(21);
-                          }}
-                          className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
-                            darkMode
-                              ? 'bg-slate-700 hover:bg-slate-600 text-white'
-                              : 'bg-slate-300 hover:bg-slate-400 text-slate-900'
-                          }`}
-                          title="Reset to all frets"
-                        >
-                          Reset
+                        <button onClick={() => { setStartFret(1); setEndFret(21); }} className="fl-btn h-9 px-3 text-xs" title="Show all frets">
+                          All
                         </button>
                       </div>
                     </div>
-                  </div>
-                )}
-                    </div>
 
-                {(page === 'Explorer' || page === 'FretBoard') && (
-                  <div className={`mt-3 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    Current Scale: <span className="font-semibold">{rootNote} {scaleNames[scaleType]}</span>
-                  </div>
-                )}
-              </div>
-            </div>
+                    <div className="w-px self-stretch bg-[#332b22] mx-1 hidden lg:block" />
 
-            {isSidebarOpen && (
-              <div
-                className="fixed inset-0 bg-black/50 z-40"
-                onClick={() => setIsSidebarOpen(false)}
-              />
-            )}
-
-            <div
-              className={`fixed top-0 left-0 h-full w-64 z-50 transform transition-transform duration-300 ${
-                isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-              } ${darkMode ? 'bg-[#1c1c1c] border-r border-[#2c2c2c] text-white' : 'bg-white border-r border-gray-200 text-slate-900'}`}
-            >
-              <div className="p-4 flex items-center justify-between border-b border-white/5">
-                <div className="font-semibold">Menu</div>
-                    <button
-                  onClick={() => setIsSidebarOpen(false)}
-                  className={`h-8 w-8 grid place-items-center rounded ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}
-                  title="Close"
-                >
-                  ✕
-                </button>
-              </div>
-              <nav className="p-2">
-                {[
-                  { key: 'Home', label: 'Home' },
-                  { key: 'FretBoard', label: 'Fretboard' },
-                  { key: 'Tuner', label: 'Tuner' },
-                  { key: 'Jam Mode', label: 'Jam Mode' },
-                  { key: 'About', label: 'About' },
-                ].map(item => (
-                  <button
-                    key={item.key}
-                    onClick={() => { setPage(item.key); setIsSidebarOpen(false); }}
-                    className={`w-full text-left px-3 py-2 rounded mb-1 font-medium transition-colors ${
-                      page === item.key
-                        ? 'bg-indigo-600 text-white'
-                        : darkMode
-                        ? 'hover:bg-slate-800 text-slate-200'
-                        : 'hover:bg-slate-100 text-slate-800'
-                    }`}
-                  >
-                    {item.label}
-                    </button>
-                ))}
-              </nav>
-                </div>
-
-            {page === 'Home' && (
-              <div className="container mx-auto px-4 py-12">
-                <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-3xl font-semibold mb-3`}>FretLab</div>
-                <div className={`${darkMode ? 'text-slate-300' : 'text-slate-700'} mb-6`}>
-                  Practice your scales and chords every day.
-                </div>
-                <div className="flex gap-3 mt-6">
-                  <button onClick={() => setPage('FretBoard')} className={`${darkMode ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-indigo-500 hover:bg-indigo-600 text-white'} px-4 py-2 rounded-lg font-medium`}>
-                    Open Fretboard
-                  </button>
-                  <button onClick={() => setPage('Tuner')} className={`${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-300 hover:bg-slate-400 text-slate-900'} px-4 py-2 rounded-lg font-medium`}>
-                    Open Tuner
-                  </button>
-              </div>
-            </div>
-            )}
-
-            {(page === 'Explorer' || page === 'FretBoard') && (
-            <>
-            <div className="w-full px-2 py-8 flex gap-1">
-              <div className={`${darkMode ? 'bg-[#1c1c1c]' : 'bg-white'} rounded-lg p-2 h-fit w-24`}>
-                <div className="flex flex-col gap-2">
-                  <button
-                    onClick={() => setDrawingMode(drawingMode === 'draw' ? null : 'draw')}
-                    className={`px-2 py-2 rounded-lg font-medium transition-colors text-sm ${
-                      drawingMode === 'draw'
-                        ? 'bg-blue-600 text-white'
-                        : darkMode
-                        ? 'bg-slate-800 hover:bg-slate-700 text-white'
-                        : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
-                    }`}
-                    title="Draw"
-                  >
-                    ✏️Draw
-                  </button>
-
-                  <button
-                    onClick={() => setDrawingMode(drawingMode === 'erase' ? null : 'erase')}
-                    className={`px-2 py-2 rounded-lg font-medium transition-colors text-sm ${
-                      drawingMode === 'erase'
-                        ? 'bg-red-600 text-white'
-                        : darkMode
-                        ? 'bg-slate-800 hover:bg-slate-700 text-white'
-                        : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
-                    }`}
-                    title="Erase"
-                  >
-                    🧹Erase
-                  </button>
-
-                  <button
-                    onClick={handleSaveDrawing}
-                    disabled={!hasActiveDrawing}
-                    className={`px-2 py-2 rounded-lg font-medium transition-colors text-sm ${
-                      !hasActiveDrawing
-                        ? 'bg-slate-500/40 text-slate-300 cursor-not-allowed'
-                        : darkMode
-                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                        : 'bg-emerald-500 hover:bg-emerald-600 text-white'
-                    }`}
-                    title="Save current diagram"
-                  >
-                    💾Save
-                  </button>
-
-                  <button
-                    onClick={() => setDrawings({})}
-                    className={`px-2 py-2 rounded-lg font-medium transition-colors text-sm ${
-                      darkMode
-                        ? 'bg-slate-800 hover:bg-slate-700 text-white'
-                        : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
-                    }`}
-                    title="Clear all"
-                  >
-                    🔄Clear
-                  </button>
-                </div>
-                <div className={`mt-3 text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                </div>
-                <div className={`mt-2 p-2 rounded ${darkMode ? 'bg-[#111]' : 'bg-slate-100'} overflow-hidden`}>
-                  <div className={`text-xs mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Metronome</div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="20"
-                      max="300"
-                      step="1"
-                      value={bpm}
-                      inputMode="numeric"
-                      onChange={(e)=> setBpm(Math.max(20, Math.min(300, parseInt(e.target.value) || 0)))}
-                      onBlur={(e)=> setBpm(Math.max(20, Math.min(300, parseInt(e.target.value) || 100)))}
-                      className={`w-[72px] px-2 py-1 text-xs rounded ${darkMode ? 'bg-slate-800 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'} border`}
-                    />
-                  </div>
-                  <div className="flex gap-2 mt-2">
-                    {!isMetronomeOn ? (
-                      <button onClick={startMetronome} className={`${darkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} px-2 py-1 rounded text-xs font-medium w-full`}>Start</button>
-                    ) : (
-                      <button onClick={stopMetronome} className={`${darkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'} px-2 py-1 rounded text-xs font-medium w-full`}>Stop</button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto flex-1">
-                <div className="block w-full">
-                  <div className={`${darkMode ? 'bg-[#2a2a2a]' : 'bg-gray-200'} rounded-lg p-8 relative`}>
-                    <div className="flex mb-2">
-                      <div className="w-16"></div>
-                      <div className="flex flex-1">
-                      {[...Array(21)].map((_, fret) => {
-                        const fretNum = fret + 1;
-                        if (fretNum < startFret || fretNum > endFret) return null;
-                        return (
-                          <div
-                            key={fret}
-                              className={`text-center text-xs font-semibold ${
-                              darkMode ? 'text-slate-400' : 'text-slate-600'
-                            }`}
-                              style={{ width: `${100 / visibleFretCount}%` }}
-                          >
-                            {fretNum}
-                          </div>
-                        );
-                      })}
+                    <div className="flex items-end gap-3">
+                      <div className="flex flex-col items-center gap-1">
+                        <Knob value={bpm} min={20} max={300} />
+                        <label className="fl-label">Tempo</label>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <input
+                          type="number" min="20" max="300" step="1" value={bpm} inputMode="numeric"
+                          onChange={(e) => setBpm(Math.max(20, Math.min(300, parseInt(e.target.value) || 0)))}
+                          onBlur={(e) => setBpm(Math.max(20, Math.min(300, parseInt(e.target.value) || 100)))}
+                          className="fl-input h-9 w-[70px] px-2 text-sm text-center font-semibold"
+                        />
+                        {!isMetronomeOn ? (
+                          <button onClick={startMetronome} className="fl-btn-primary h-8 px-2 text-xs">▶ Click</button>
+                        ) : (
+                          <button onClick={stopMetronome} className="fl-btn-danger h-8 px-2 text-xs">■ Stop</button>
+                        )}
                       </div>
                     </div>
 
-                    {strings.map((string, stringIndex) => (
-                      <div key={stringIndex} className="flex items-center mb-1">
-                        <div
-                          className={`w-14 text-center font-bold ${
-                            darkMode ? 'text-slate-200' : 'text-slate-700'
-                          }`}
-                        >
-                          {string.name}
-                        </div>
-
-                        <div className="flex flex-1 relative">
-                          <div
-                            className={`absolute left-0 right-0 top-1/2 transform -translate-y-1/2 ${
-                              darkMode ? 'bg-slate-600' : 'bg-slate-400'
-                            }`}
-                            style={{ height: `${2 + stringIndex * 0.3}px` }}
-                          ></div>
-
-                          {[...Array(21)].map((_, fret) => {
-                            const fretNum = fret + 1; // Display fret number starting from 1
-                            const noteIndex = getNoteAtFret(string.openNote, fretNum);
-                            const inScale = isNoteInScale(noteIndex);
-                            const isRoot = isRootNote(noteIndex);
-                            const degree = getScaleDegree(noteIndex);
-                            const isHovered = hoveredNote === `${stringIndex}-${fretNum}`;
-
-                            if (fretNum < startFret || fretNum > endFret) return null;
-
-                            const drawKey = `${stringIndex}-${fretNum}`;
-                            const isDrawn = drawings[drawKey];
-                            
-                            return (
-                            <div
-                              key={fret}
-                              className="h-14 flex items-center justify-center relative rounded-lg"
-                                style={{ width: `${100 / visibleFretCount}%` }}
-                                onMouseEnter={() => setHoveredNote(drawKey)}
-                                onMouseLeave={() => setHoveredNote(null)}
-                                onClick={() => {
-                                  if (drawingMode === 'draw') {
-                                    setDrawings({...drawings, [drawKey]: true});
-                                  } else if (drawingMode === 'erase') {
-                                    const newDrawings = {...drawings};
-                                    delete newDrawings[drawKey];
-                                    setDrawings(newDrawings);
-                                  }
-                                }}
-                              >
-                                {fret > 0 && (
-                                  <div
-                                    className={`absolute left-0 top-0 bottom-0 w-0.5 ${
-                                      darkMode ? 'bg-slate-700' : 'bg-slate-300'
-                                    }`}
-                                  ></div>
-                                )}
-
-                                {isDrawn && (
-                                  <div className="absolute inset-0 border-4 border-yellow-400 rounded-lg pointer-events-none z-20" />
-                                )}
-
-                                {(() => {
-                                  if (selectedChord) {
-                                    const shouldShow = isToneInChord(noteIndex);
-                                    if (!shouldShow) return null;
-                                  } else if (!inScale) return null;
-                                  
-                                  const isChordRootNote = isChordRoot(noteIndex);
-                                  const isChordThirdNote = isChordThird(noteIndex);
-                                  const isScaleRootNote = isRootNote(noteIndex);
-                                  
-                                  let bgColor;
-                                  if (selectedChord) {
-                                    if (isChordRootNote) bgColor = rootColor;
-                                    else if (isChordThirdNote) bgColor = thirdColor;
-                                    else bgColor = noteColor;
-                                  } else {
-                                    bgColor = isScaleRootNote ? rootColor : noteColor;
-                                  }
-                                  
-                                  return (
-                                    <div
-                                      className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold cursor-default transition-all ${isHovered ? 'scale-110 shadow-lg' : 'shadow-md'}`}
-                                      style={{ 
-                                        backgroundColor: bgColor,
-                                        color: '#ffffff'
-                                      }}
-                                    >
-                                      {showDegrees ? formatDegree(degree, noteIndex) : notes[noteIndex]}
-                                    </div>
-                                  );
-                                })()}
-
-                                {stringIndex === 2 && (fretNum === 3 || fretNum === 5 || fretNum === 7 || fretNum === 9 || fretNum === 15 || fretNum === 17 || fretNum === 19 || fretNum === 21) && (
-                                  <div
-                                    className={`absolute w-2 h-2 rounded-full ${
-                                      darkMode ? 'bg-slate-600' : 'bg-slate-400'
-                                    } opacity-50`}
-                                    style={{ top: '50%', transform: 'translateY(-50%)' }}
-                                  ></div>
-                                )}
-                                {stringIndex === 3 && fretNum === 12 && (
-                                  <div
-                                    className={`absolute w-2 h-2 rounded-full ${
-                                      darkMode ? 'bg-slate-600' : 'bg-slate-400'
-                                    } opacity-50`}
-                                    style={{ top: '30%', transform: 'translateY(-50%)' }}
-                                  ></div>
-                                )}
-                                {stringIndex === 2 && fretNum === 12 && (
-                                  <div
-                                    className={`absolute w-2 h-2 rounded-full ${
-                                      darkMode ? 'bg-slate-600' : 'bg-slate-400'
-                                    } opacity-50`}
-                                    style={{ top: '70%', transform: 'translateY(-50%)' }}
-                                  ></div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="container mx-auto px-2 mt-6">
-              <div className={`${darkMode ? 'bg-[#1c1c1c]' : 'bg-white'} rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-300'} p-4`}>
-                <div className="flex items-center justify-between mb-3">
-                  <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>Saved Fretboard Notes</div>
-                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Tap a saved set to load it.
-                  </div>
-                </div>
-                {savedDrawings.length === 0 ? (
-                  <div className={`${darkMode ? 'text-slate-400' : 'text-slate-600'} text-sm`}>
-                    No saved notes. Draw, name it, then save.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {savedDrawings.map((preset) => {
-                      const count = Object.keys(preset.data || {}).length;
-                      return (
-                        <div
-                          key={preset.id}
-                          onClick={() => loadSavedDrawing(preset.id)}
-                          className={`group rounded-lg border px-3 py-2 cursor-pointer transition ${
-                            darkMode
-                              ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-white'
-                              : 'bg-white border-slate-200 hover:bg-slate-100 text-slate-900'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="font-semibold text-sm truncate">{preset.name}</div>
-                            <button
-                              type="button"
-                              aria-label={`Delete ${preset.name}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteSavedDrawing(preset.id);
-                              }}
-                              className={`px-2 py-1 rounded text-xs font-semibold transition ${
-                                darkMode
-                                  ? 'text-slate-300 hover:bg-slate-600'
-                                  : 'text-slate-500 hover:bg-slate-200'
-                              }`}
-                            >
-                              ⋮
-                            </button>
-                          </div>
-                          <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                            {count} note{count === 1 ? '' : 's'} • {preset.root || rootNote} {scaleNames[preset.scale] || scaleNames[scaleType]}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-            </>
-            )}
-
-            {page === 'Tuner' && (
-              <div className="container mx-auto px-4 py-12">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-2xl font-semibold`}>Guitar Tuner</div>
-                    <label className={`flex items-center gap-2 text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      <input type="checkbox" checked={autoDetectString} onChange={(e)=> setAutoDetectString(e.target.checked)} />
-                      Auto string detect
-                    </label>
-                  </div>
-                  <div className="flex gap-2">
-                    {!isTunerOn ? (
-                      <button onClick={startTuner} className={`${darkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} px-4 py-2 rounded-lg font-medium`}>
-                        Start
+                    <div className="ml-auto flex items-end gap-2">
+                      <button
+                        onClick={() => setDrawingMode(drawingMode === 'draw' ? null : 'draw')}
+                        className={`h-9 px-3.5 text-[13px] rounded-lg ${drawingMode === 'draw' ? 'fl-btn-primary' : 'fl-btn'}`}
+                        title="Draw on the fretboard"
+                      >
+                        ✏️ Draw
                       </button>
-                    ) : (
-                      <button onClick={stopTuner} className={`${darkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'} px-4 py-2 rounded-lg font-medium`}>
-                        Stop
+                      <button
+                        onClick={() => setDrawingMode(drawingMode === 'erase' ? null : 'erase')}
+                        className={`h-9 px-3.5 text-[13px] rounded-lg ${drawingMode === 'erase' ? 'fl-btn-danger' : 'fl-btn'}`}
+                        title="Erase marks"
+                      >
+                        🧹 Erase
                       </button>
-                    )}
-                  </div>
-                </div>
-
-                {tunerError && (
-                  <div className={`${darkMode ? 'bg-red-900/40 text-red-200 border-red-700' : 'bg-red-100 text-red-800 border-red-300'} border rounded p-3 mb-4`}>
-                    Microphone error: {tunerError}
-                  </div>
-                )}
-
-                <div className={`${darkMode ? 'bg-[#1c1c1c]' : 'bg-white'} rounded-xl border ${darkMode ? 'border-[#2c2c2c]' : 'border-gray-200'} p-6 grid grid-cols-1 md:grid-cols-3 gap-6`}>
-                  <div className="md:col-span-2 flex flex-col items-center justify-center">
-                    <div className="relative w-64 h-32">
-                      <div className="absolute inset-0 flex items-end justify-center">
-                        <div className={`${darkMode ? 'text-slate-400' : 'text-slate-600'} text-xs`}>-50¢</div>
-                        <div className="flex-1" />
-                        <div className={`${darkMode ? 'text-slate-400' : 'text-slate-600'} text-xs`}>+50¢</div>
-                      </div>
-                      <div className="absolute left-1/2 bottom-0 -translate-x-1/2 w-8 h-24 bg-green-500/25 rounded" />
-                      <div className="absolute left-1/2 bottom-0 -translate-x-1/2 w-1 h-24 bg-indigo-600 origin-bottom rounded"
-                        style={{ transform: `translateX(-50%) rotate(${(tunerCents / 50) * 45}deg)` }}
-                      />
-                      <div className="absolute left-0 right-0 bottom-0 h-1.5 ${darkMode ? 'bg-slate-700' : 'bg-slate-300'} rounded" />
-                    </div>
-                    <div className="mt-6 text-center">
-                      <div className={`${darkMode ? 'text-slate-300' : 'text-slate-700'} text-sm`}>Detected</div>
-                      <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-5xl font-bold leading-tight`}>{tunerNote}</div>
-                      <div className={`${darkMode ? 'text-slate-300' : 'text-slate-700'} text-sm mt-1`}>{tunerFreq ? tunerFreq.toFixed(1) + ' Hz' : '--'}</div>
-                      <div className={`mt-2 text-sm font-medium ${Math.abs(tunerCents) <= 5 ? 'text-green-500' : 'text-amber-500'}`}>
-                        {Math.abs(tunerCents) <= 5 ? 'In tune' : tunerCents < 0 ? `${Math.abs(tunerCents)}¢ flat` : `${tunerCents}¢ sharp`}
-                      </div>
-                      <div className="mt-4 flex flex-col items-center gap-1">
-                        <div className={`${darkMode ? 'text-slate-200' : 'text-slate-900'} text-sm font-semibold`}>
-                          Target: {tuningPresets[tuning][selectedString]}
-                        </div>
-                        <div className="w-40 h-2 rounded-full overflow-hidden border border-black/10">
-                          {(() => {
-                            const start = stringHoldStart;
-                            const progress = stringConfirmed ? 1 : (start ? Math.min(1, (performance.now() - start) / 3000) : 0);
-                            const barColor = stringConfirmed ? 'bg-green-500' : 'bg-amber-500';
-                            return <div className={`${barColor} h-full`} style={{ width: `${progress * 100}%` }} />;
-                          })()}
-                        </div>
-                      </div>
+                      <button
+                        onClick={handleSaveDrawing}
+                        disabled={!hasActiveDrawing}
+                        className="fl-btn-primary h-9 px-3.5 text-[13px]"
+                        title="Save current diagram"
+                      >
+                        💾 Save
+                      </button>
+                      <button onClick={() => setDrawings({})} className="fl-btn h-9 px-3.5 text-[13px]" title="Clear all marks">
+                        🔄 Clear
+                      </button>
                     </div>
                   </div>
-                  <div className="space-y-3">
-                    <div className={`text-sm ${darkMode ? 'text-slate-200' : 'text-slate-900'} font-semibold`}>Tuning</div>
-                    <select
-                      value={tuning}
-                      onChange={(e)=> setTuning(e.target.value)}
-                      className={`w-full px-3 h-9 text-sm rounded-lg ${darkMode ? 'bg-slate-800 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'} border focus:outline-none`}
-                    >
-                      <option value="standard">Standard (E A D G B E)</option>
-                      <option value="dropD">Drop D (D A D G B E)</option>
-                      <option value="halfStepDown">Half-step Down (D# G# C# F# A# D#)</option>
-                    </select>
 
-                    <div className={`mt-2 ${darkMode ? 'bg-[#0f0f0f] border-[#2c2c2c]' : 'bg-slate-100 border-slate-300'} border rounded-lg p-3`}>
-                      <div className={`text-xs mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Headstock</div>
-                      <div className="relative w-72 h-44 mx-auto">
-                        <div className={`absolute left-1/2 -translate-x-1/2 top-2 bottom-2 w-20 rounded-[24px] ${darkMode ? 'bg-[#2a1b10]' : 'bg-amber-800'} shadow-inner`} />
-                        <div className={`${darkMode ? 'bg-slate-300' : 'bg-slate-200'} absolute left-1/2 -translate-x-1/2 bottom-2 h-1 w-24 rounded`} />
-
-                        {(() => {
-                          const positions = [
-                            { idx: 0, side: 'left', top: '76%' },
-                            { idx: 1, side: 'left', top: '50%' },
-                            { idx: 2, side: 'left', top: '24%' },
-                            { idx: 3, side: 'right', top: '24%' },
-                            { idx: 4, side: 'right', top: '50%' },
-                            { idx: 5, side: 'right', top: '76%' },
-                          ];
-
-                          return positions.map((p) => {
-                            const open = tuningPresets[tuning][p.idx];
-                            const isSelected = p.idx === selectedString;
-                            const pillClass = isSelected
-                              ? (stringConfirmed
-                                  ? 'bg-green-600 text-white border-green-600'
-                                  : 'bg-amber-500 text-white border-amber-500')
-                              : `${darkMode ? 'bg-slate-800 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`;
-                            const pegSideClass = p.side === 'left' ? 'left-3' : 'right-3';
-                            const labelSideClass = p.side === 'left' ? 'left-12' : 'right-12';
-                            const stringAnchorClass = p.side === 'left' ? 'left-[88px]' : 'right-[88px]';
-                            return (
-                              <div key={p.idx} className="absolute" style={{ top: p.top, left: 0, right: 0 }}>
-                                <div className={`absolute ${stringAnchorClass} h-0.5 ${darkMode ? 'bg-slate-500' : 'bg-slate-400'} w-16`} />
-                                <div className={`absolute ${pegSideClass} -translate-y-1/2`}>
-                                  <div className={`${darkMode ? 'bg-zinc-300' : 'bg-zinc-200'} w-4 h-4 rounded-full shadow`} />
-                                </div>
-                                <button
-                                  type="button"
-                                  className={`absolute ${labelSideClass} -translate-y-1/2 px-2 py-0.5 text-xs rounded-full border ${pillClass}`}
-                                  onClick={() => {
-                                    setSelectedString(p.idx);
-                                    playStringSound(p.idx);
-                                  }}
-                                >
-                                  {open}
-                                </button>
-                              </div>
-                            );
-                          });
-                        })()}
+                  {/* Fretboard */}
+                  <div className="fl-panel p-5 overflow-x-auto">
+                    <div className="min-w-[900px]">
+                      <div className="flex mb-2.5 pl-12">
+                        {[...Array(21)].map((_, fret) => {
+                          const fretNum = fret + 1;
+                          if (fretNum < startFret || fretNum > endFret) return null;
+                          return (
+                            <div key={fret} className="text-center text-[11px] font-bold text-[#6e6353]"
+                              style={{ width: `${100 / visibleFretCount}%` }}>
+                              {fretNum}
+                            </div>
+                          );
+                        })}
                       </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
-            
+                      <div className="wood rounded-xl overflow-hidden">
+                        {strings.map((string, stringIndex) => (
+                          <div key={stringIndex} className="flex items-center h-[52px]">
+                            <div className="w-12 text-center font-extrabold text-[13px] text-[#f5e9d0]/85 select-none">
+                              {string.name}
+                            </div>
+                            <div className="flex flex-1 relative h-full">
+                              <div
+                                className="string-metal absolute left-0 right-0 top-1/2 -translate-y-1/2"
+                                style={{ height: `${1 + stringIndex * 0.4}px` }}
+                              ></div>
 
-            {page === 'About' && (
-              <div className="container mx-auto px-4 py-12">
-                <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-2xl font-semibold mb-4`}>About</div>
-                <div className={`${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Nathan Kwon</div>
-              </div>
-            )}
+                              {[...Array(21)].map((_, fret) => {
+                                const fretNum = fret + 1;
+                                const noteIndex = getNoteAtFret(string.openNote, fretNum);
+                                const inScale = isNoteInScale(noteIndex);
+                                const degree = getScaleDegree(noteIndex);
+                                const isHovered = hoveredNote === `${stringIndex}-${fretNum}`;
 
-            {page === 'Jam Mode' && (
-              <div className="container mx-auto px-4 py-12 max-w-5xl">
-                <div className={`${darkMode ? 'text-white' : 'text-slate-900'} text-2xl font-semibold mb-6`}>Jam Mode</div>
+                                if (fretNum < startFret || fretNum > endFret) return null;
 
-                {isCountdownActive && countdown !== null && (
-                  <div className="fixed inset-0 z-40 pointer-events-none flex items-center justify-center">
-                    <div className={`text-[8rem] md:text-[10rem] font-extrabold drop-shadow ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                      {countdown}
-                    </div>
-                  </div>
-                )}
+                                const drawKey = `${stringIndex}-${fretNum}`;
+                                const isDrawn = drawings[drawKey];
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'} border rounded-lg p-4`}>
-                    <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium mb-3`}>Key</div>
-                    <select
-                      value={selectedKey}
-                      onChange={(e) => setSelectedKey(e.target.value)}
-                      className={`w-full px-3 py-2 rounded border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
-                      disabled={isRecording || isCountdownActive}
-                    >
-                      {musicalKeys.map((key) => (
-                        <option key={key} value={key}>{key}</option>
-                      ))}
-                    </select>
-                    <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium mt-5 mb-3`}>Chord Progression</div>
-                    <select
-                      value={selectedProgression ?? ''}
-                      onChange={(e) => setSelectedProgression(e.target.value === '' ? null : parseInt(e.target.value))}
-                      className={`w-full px-3 py-2 rounded border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
-                    >
-                      <option value="">None</option>
-                      {chordProgressions.map((prog, idx) => (
-                        <option key={idx} value={idx}>{prog.name}</option>
-                      ))}
-                    </select>
-                    {selectedProgression !== null && chordProgressions[selectedProgression].romans.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {chordsForProgression(selectedKey, chordProgressions[selectedProgression].romans).map((chord, idx) => (
-                          <div key={idx} className={`px-3 py-1 rounded ${darkMode ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-900'} font-medium`}>
-                            {chord}
+                                return (
+                                  <div
+                                    key={fret}
+                                    className="h-full flex items-center justify-center relative"
+                                    style={{ width: `${100 / visibleFretCount}%` }}
+                                    onMouseEnter={() => setHoveredNote(drawKey)}
+                                    onMouseLeave={() => setHoveredNote(null)}
+                                    onClick={() => {
+                                      if (drawingMode === 'draw') {
+                                        setDrawings({ ...drawings, [drawKey]: true });
+                                      } else if (drawingMode === 'erase') {
+                                        const newDrawings = { ...drawings };
+                                        delete newDrawings[drawKey];
+                                        setDrawings(newDrawings);
+                                      }
+                                    }}
+                                  >
+                                    <div className="fret-wire absolute left-0 top-0 bottom-0 w-[3px]"></div>
+
+                                    {isDrawn && (
+                                      <div className="absolute inset-1 border-[3px] border-[#fcd34d] rounded-lg pointer-events-none z-20 shadow-[0_0_10px_rgba(252,211,77,.4)]" />
+                                    )}
+
+                                    {(() => {
+                                      if (selectedChord) {
+                                        const shouldShow = isToneInChord(noteIndex);
+                                        if (!shouldShow) return null;
+                                      } else if (!inScale) return null;
+
+                                      const isChordRootNote = isChordRoot(noteIndex);
+                                      const isChordThirdNote = isChordThird(noteIndex);
+                                      const isScaleRootNote = isRootNote(noteIndex);
+
+                                      let bgColor;
+                                      let glow = false;
+                                      if (selectedChord) {
+                                        if (isChordRootNote) { bgColor = rootColor; glow = true; }
+                                        else if (isChordThirdNote) bgColor = thirdColor;
+                                        else bgColor = noteColor;
+                                      } else {
+                                        bgColor = isScaleRootNote ? rootColor : noteColor;
+                                        glow = isScaleRootNote;
+                                      }
+
+                                      return (
+                                        <div
+                                          className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-extrabold cursor-default transition-transform shadow-[0_2px_6px_rgba(0,0,0,.5)] ${glow ? 'note-root-glow' : ''} ${isHovered ? 'scale-110' : ''}`}
+                                          style={{
+                                            backgroundColor: bgColor,
+                                            color: isLightColor(bgColor) ? '#2b1f10' : '#fff8ec'
+                                          }}
+                                        >
+                                          {showDegrees ? formatDegree(degree, noteIndex) : noteNames[noteIndex]}
+                                        </div>
+                                      );
+                                    })()}
+
+                                    {stringIndex === 2 && (fretNum === 3 || fretNum === 5 || fretNum === 7 || fretNum === 9 || fretNum === 15 || fretNum === 17 || fretNum === 19 || fretNum === 21) && (
+                                      <div className="inlay-pearl absolute w-2.5 h-2.5 rounded-full"
+                                        style={{ top: '50%', transform: 'translateY(-50%)' }}></div>
+                                    )}
+                                    {stringIndex === 3 && fretNum === 12 && (
+                                      <div className="inlay-pearl absolute w-2.5 h-2.5 rounded-full"
+                                        style={{ top: '30%', transform: 'translateY(-50%)' }}></div>
+                                    )}
+                                    {stringIndex === 2 && fretNum === 12 && (
+                                      <div className="inlay-pearl absolute w-2.5 h-2.5 rounded-full"
+                                        style={{ top: '70%', transform: 'translateY(-50%)' }}></div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         ))}
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Diatonic chords */}
+                  <div className="mt-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-extrabold text-[#f5e9d0]">
+                        Chords in scale <span className="text-[#6e6353] font-semibold text-sm">({chordType})</span>
+                      </h3>
+                      {selectedChord && (
+                        <button onClick={() => setSelectedChord(null)} className="fl-btn h-8 px-3.5 text-[12.5px]">
+                          ✕ Clear selection
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      {buildDiatonicChords.map((ch) => {
+                        const isSel = selectedChord && selectedChord.name === ch.name;
+                        return (
+                          <div
+                            key={`${ch.degree}-${ch.name}`}
+                            onClick={() => setSelectedChord(isSel ? null : ch)}
+                            className={`fl-card px-4 py-3 min-w-[126px] cursor-pointer transition ${
+                              isSel ? 'border-[#f59e0b] shadow-[0_0_0_1px_#f59e0b,0_0_16px_rgba(245,158,11,.25)]' : 'hover:border-[#5a4c39]'
+                            }`}
+                          >
+                            <div className="fl-label">{romanForChord(ch)}</div>
+                            <div className="font-extrabold text-base text-[#f5e9d0] mt-0.5 mb-2">{ch.name}</div>
+                            <div className="flex gap-1">
+                              {ch.pcs.map((pc, idx) => {
+                                const c = idx === 0 ? rootColor : (idx === 1 ? thirdColor : noteColor);
+                                return (
+                                  <div key={idx} className="w-[19px] h-[19px] rounded-full grid place-items-center text-[9px] font-extrabold"
+                                    style={{ backgroundColor: c, color: isLightColor(c) ? '#2b1f10' : '#fff8ec' }}>
+                                    {noteNames[pc]}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Saved fretboard notes */}
+                  <div className="fl-panel mt-6 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="font-extrabold text-[#f5e9d0]">Saved fretboard notes</div>
+                      <div className="text-xs text-[#6e6353]">Tap a saved set to load it.</div>
+                    </div>
+                    {savedDrawings.length === 0 ? (
+                      <div className="text-sm text-[#a89a86]">No saved notes yet. Draw on the board, then hit 💾 Save.</div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {savedDrawings.map((preset) => {
+                          const count = Object.keys(preset.data || {}).length;
+                          return (
+                            <div
+                              key={preset.id}
+                              onClick={() => loadSavedDrawing(preset.id)}
+                              className="fl-card px-3.5 py-2.5 cursor-pointer hover:border-[#5a4c39] transition"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="font-bold text-sm truncate text-[#f5e9d0]">{preset.name}</div>
+                                <button
+                                  type="button"
+                                  aria-label={`Delete ${preset.name}`}
+                                  onClick={(e) => { e.stopPropagation(); deleteSavedDrawing(preset.id); }}
+                                  className="text-[#6e6353] hover:text-[#f87356] px-1.5 rounded text-sm font-bold"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                              <div className="text-xs mt-1 text-[#a89a86]">
+                                {count} note{count === 1 ? '' : 's'} • {preset.root || rootNote} {scaleNames[preset.scale] || scaleNames[scaleType]}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ---------------- Tuner ---------------- */}
+              {page === 'Tuner' && (
+                <div className="max-w-5xl mx-auto px-8 py-10">
+                  <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-4">
+                      <div className="text-2xl font-extrabold text-[#f5e9d0]">Chromatic Tuner</div>
+                      <div className="fl-switch h-8 items-center">
+                        <button className={`px-3.5 h-full text-xs ${autoDetectString ? 'on' : ''}`} onClick={() => setAutoDetectString(true)}>Auto detect</button>
+                        <button className={`px-3.5 h-full text-xs ${!autoDetectString ? 'on' : ''}`} onClick={() => setAutoDetectString(false)}>Manual</button>
+                      </div>
+                    </div>
+                    {!isTunerOn ? (
+                      <button onClick={startTuner} className="fl-btn-primary h-10 px-6 text-sm">● Start tuning</button>
+                    ) : (
+                      <button onClick={stopTuner} className="fl-btn-danger h-10 px-6 text-sm">■ Stop</button>
                     )}
                   </div>
 
-                  <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'} border rounded-lg p-4`}>
-                    <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium mb-3`}>Click Track</div>
-                    <div className="flex items-center gap-3 mb-4">
-                      <input
-                        type="number"
-                        min={20}
-                        max={300}
-                        value={bpm}
-                        onChange={(e) => {
-                          const v = Math.max(20, Math.min(300, Number(e.target.value) || 0));
-                          setBpm(v);
-                        }}
-                        className={`w-24 px-3 py-2 rounded border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
-                      />
-                      <button
-                        onClick={() => setIsMetronomeEnabled(!isMetronomeEnabled)}
-                        className={`px-4 py-2 rounded font-medium ${isMetronomeEnabled ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}`}
-                      >
-                        {isMetronomeEnabled ? 'Disable' : 'Enable'}
-                      </button>
-                    </div>
-                    <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>1 bar countdown at {bpm} BPM</div>
-                  </div>
-                </div>
-
-                <div className="mt-4 w-full max-w-2xl mx-auto text-center">
-                  {isLoopProcessing && (
-                    <div className={`text-sm font-medium ${darkMode ? 'text-amber-300' : 'text-amber-600'}`}>
-                      Quantizing…
+                  {tunerError && (
+                    <div className="border border-[#9a3412] bg-[#2b1410] text-[#fca5a5] rounded-lg p-3 mb-4 text-sm">
+                      Microphone error: {tunerError}
                     </div>
                   )}
-                  {!isLoopProcessing && loopQuantizeInfo && (
-                    <div className={`text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                      {loopQuantizeInfo.beats} beat{loopQuantizeInfo.beats === 1 ? '' : 's'} @ {loopQuantizeInfo.bpm} BPM
-                    </div>
-                  )}
-                </div>
 
-                <div className="mt-8 flex flex-col items-center">
-                  <button
-                    onClick={() => (isRecording || isCountdownActive) ? stopRecording() : startRecording()}
-                    className={`px-7 py-3 rounded-lg font-semibold ${(isRecording || isCountdownActive)
-                      ? 'bg-red-600 hover:bg-red-700 text-white'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'} ${isLoopProcessing ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    disabled={isCropping || isLoopProcessing}
-                  >
-                    {isCountdownActive ? '⏹ Cancel Countdown' : isRecording ? '⏹ Stop Recording' : '● Start Recording'}
-                  </button>
-
-                  <div className="mt-4 flex items-center gap-3">
-                    <button
-                      onClick={() => isPlaying ? stopPlayback() : playRecordedAudio()}
-                      className={`px-5 py-2 rounded ${isPlaying ? 'bg-orange-600 hover:bg-orange-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}`}
-                    >
-                      {isPlaying ? '⏸ Pause' : '▶ Play'}
-                    </button>
-                    <button
-                      onClick={() => { const nl = !isLooping; setIsLooping(nl); jamModeRef.current.shouldLoop = nl; }}
-                      className={`px-5 py-2 rounded ${isLooping ? 'bg-purple-600 hover:bg-purple-700 text-white' : (darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-900')}`}
-                    >
-                      {isLooping ? '🔁 Looping' : '🔁 Loop'}
-                    </button>
-                    <button
-                      onClick={() => setShowCropUI(!showCropUI)}
-                      className={`px-5 py-2 rounded ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-900'}`}
-                    >
-                      ✂ Edit
-                    </button>
-                    <button
-                      onClick={() => saveLoopToDb()}
-                      disabled={!recordedAudio}
-                      className={`px-5 py-2 rounded ${recordedAudio ? 'bg-teal-600 hover:bg-teal-700 text-white' : (darkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-400')}`}
-                    >
-                      💾 Save
-                    </button>
-                  </div>
-                </div>
-
-                {showCropUI && recordedAudio && (
-                  <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'} border rounded-lg p-4 mt-6 max-w-3xl mx-auto w-full`}>
-                    <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium mb-2`}>Trim</div>
-                    <div className={`text-xs mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Drag handles to trim.
-                    </div>
-
-                    <div className={`${darkMode ? 'bg-slate-900' : 'bg-slate-100'} rounded-md p-3 border ${darkMode ? 'border-slate-700' : 'border-slate-300'}`}>
-                      <canvas id="waveform-canvas" width="800" height="140" className="w-full h-[140px] rounded bg-transparent cursor-pointer select-none touch-none" />
-                    </div>
-
-                    <div className="flex items-center gap-3 mt-4">
-                      <button onClick={cropAudio} disabled={isCropping || isRecording}
-                        className={`px-5 py-2 rounded ${isCropping || isRecording ? 'bg-slate-400 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
-                        {isCropping ? 'Trimming...' : 'Apply Trim'}
-                      </button>
-                      <button onClick={undoTrim} disabled={undoStack.length === 0 || isCropping || isRecording}
-                        className={`px-5 py-2 rounded ${undoStack.length === 0 || isCropping || isRecording ? 'bg-slate-400 text-white' : 'bg-amber-600 hover:bg-amber-700 text-white'}`}>
-                        ↺ Undo
-                      </button>
-                      <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Duration: {audioDuration.toFixed(2)}s</div>
-                    </div>
-                  </div>
-                )}
-
-                {savedLoops && savedLoops.length > 0 && (
-                  <div className="mt-6 max-w-5xl mx-auto w-full">
-                    <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium mb-2`}>Saved Loops</div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {savedLoops.map(loop => (
-                        <div key={loop.id} className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'} border rounded p-3 flex items-center justify-between`}>
-                          <div>
-                            <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium text-sm`}>{loop.name || 'Untitled Loop'}</div>
-                            <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                              {loop.progressionName ? `${loop.progressionName} • ` : ''}Key: {loop.key} • BPM: {loop.bpm}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => loadLoop(loop.id)} className={`px-3 py-1.5 rounded ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-900'}`}>Load</button>
-                            <button onClick={() => deleteLoop(loop.id)} className={`px-3 py-1.5 rounded bg-red-600 hover:bg-red-700 text-white`}>Delete</button>
-                          </div>
+                  <div className="fl-panel p-6 grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div className="md:col-span-2 flex flex-col items-center justify-center">
+                      <div className="relative w-64 h-32">
+                        <div className="absolute inset-0 flex items-end justify-center">
+                          <div className="text-xs text-[#6e6353]">-50¢</div>
+                          <div className="flex-1" />
+                          <div className="text-xs text-[#6e6353]">+50¢</div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {page !== 'Home' && page !== 'Tuner' && page !== 'About' && page !== 'Jam Mode' && (
-            <div className="container mx-auto px-4 py-8">
-              <div className="mt-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className={`${darkMode ? 'text-white' : 'text-slate-900'} font-semibold`}>
-                    Chords in Scale ({chordType})
-                  </h3>
-                  {selectedChord && (
-                    <button
-                      onClick={() => setSelectedChord(null)}
-                      className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
-                        darkMode
-                          ? 'bg-slate-700 hover:bg-slate-600 text-white'
-                          : 'bg-slate-300 hover:bg-slate-400 text-slate-900'
-                      }`}
-                    >
-                      Clear Selection
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {buildDiatonicChords.map((ch) => (
-                    <div 
-                      key={`${ch.degree}-${ch.name}`} 
-                      className={`${darkMode ? 'bg-[#2a2a2a]' : 'bg-gray-200'} rounded-lg p-3 cursor-pointer transition-all hover:scale-105 ${
-                        selectedChord && selectedChord.name === ch.name ? 'ring-2 ring-yellow-400' : ''
-                      }`}
-                      onClick={() => setSelectedChord(ch)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className={`${darkMode ? 'text-white' : 'text-slate-900'} font-medium`}>
-                          {ch.degree}. {ch.name}
+                        <div className="absolute left-1/2 bottom-0 -translate-x-1/2 w-8 h-24 bg-green-500/20 rounded" />
+                        <div
+                          className="absolute left-1/2 bottom-0 -translate-x-1/2 w-1 h-24 bg-[#fbbf24] origin-bottom rounded shadow-[0_0_8px_rgba(251,191,36,.7)]"
+                          style={{ transform: `translateX(-50%) rotate(${(tunerCents / 50) * 45}deg)` }}
+                        />
+                        <div className="absolute left-0 right-0 bottom-0 h-1.5 bg-[#332b22] rounded" />
+                      </div>
+                      <div className="mt-6 text-center">
+                        <div className="fl-label">Detected</div>
+                        <div className="text-[#f5e9d0] text-5xl font-black leading-tight">{tunerNote}</div>
+                        <div className="text-sm mt-1 text-[#a89a86]">{tunerFreq ? tunerFreq.toFixed(1) + ' Hz' : '--'}</div>
+                        <div className={`mt-2 text-sm font-bold ${Math.abs(tunerCents) <= 5 ? 'text-green-400' : 'text-[#fbbf24]'}`}>
+                          {Math.abs(tunerCents) <= 5 ? 'In tune' : tunerCents < 0 ? `${Math.abs(tunerCents)}¢ flat` : `${tunerCents}¢ sharp`}
                         </div>
-                        <div className="flex -space-x-1">
-                          {ch.pcs.map((pc, idx) => (
-                            <div key={idx} className="w-6 h-6 rounded-full border border-black/10 flex items-center justify-center text-[10px] font-bold"
-                              style={{ backgroundColor: idx===0 ? rootColor : (idx===1 ? thirdColor : noteColor), color: '#fff' }}
-                            >
-                              {notes[pc]}
-                            </div>
-                          ))}
+                        <div className="mt-4 flex flex-col items-center gap-1.5">
+                          <div className="text-sm font-bold text-[#f5e9d0]">
+                            Target: <span className="text-[#fbbf24]">{tuningPresets[tuning][selectedString]}</span>
+                          </div>
+                          <div className="w-40 h-2 rounded-full overflow-hidden bg-[#141110] border border-[#332b22]">
+                            {(() => {
+                              const start = stringHoldStart;
+                              const progress = stringConfirmed ? 1 : (start ? Math.min(1, (performance.now() - start) / 3000) : 0);
+                              const barColor = stringConfirmed ? 'bg-green-500' : 'bg-[#f59e0b]';
+                              return <div className={`${barColor} h-full transition-[width]`} style={{ width: `${progress * 100}%` }} />;
+                            })()}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  ))}
+                    <div className="space-y-3">
+                      <div className="fl-label">Tuning</div>
+                      <select
+                        value={tuning}
+                        onChange={(e) => setTuning(e.target.value)}
+                        className="fl-input w-full h-9 px-3 text-sm"
+                      >
+                        <option value="standard">Standard (E A D G B E)</option>
+                        <option value="dropD">Drop D (D A D G B E)</option>
+                        <option value="halfStepDown">Half-step Down (D# G# C# F# A# D#)</option>
+                      </select>
+
+                      <div className="wood rounded-xl p-3 border border-[#453a2d]">
+                        <div className="fl-label mb-2">Headstock</div>
+                        <div className="relative w-72 h-44 mx-auto max-w-full">
+                          <div className="absolute left-1/2 -translate-x-1/2 top-2 bottom-2 w-20 rounded-[24px] bg-[#241708] shadow-inner" />
+                          <div className="absolute left-1/2 -translate-x-1/2 bottom-2 h-1 w-24 rounded bg-[#e8dcc0]" />
+
+                          {(() => {
+                            const positions = [
+                              { idx: 0, side: 'left', top: '76%' },
+                              { idx: 1, side: 'left', top: '50%' },
+                              { idx: 2, side: 'left', top: '24%' },
+                              { idx: 3, side: 'right', top: '24%' },
+                              { idx: 4, side: 'right', top: '50%' },
+                              { idx: 5, side: 'right', top: '76%' },
+                            ];
+
+                            return positions.map((p) => {
+                              const open = tuningPresets[tuning][p.idx];
+                              const isSelected = p.idx === selectedString;
+                              const pillClass = isSelected
+                                ? (stringConfirmed
+                                    ? 'bg-green-600 text-white border-green-600'
+                                    : 'bg-[#f59e0b] text-[#2b1a05] border-[#b45309] shadow-[0_0_10px_rgba(245,158,11,.5)]')
+                                : 'bg-[#141110] text-[#efe7da] border-[#453a2d]';
+                              const pegSideClass = p.side === 'left' ? 'left-3' : 'right-3';
+                              const labelSideClass = p.side === 'left' ? 'left-12' : 'right-12';
+                              const stringAnchorClass = p.side === 'left' ? 'left-[88px]' : 'right-[88px]';
+                              return (
+                                <div key={p.idx} className="absolute" style={{ top: p.top, left: 0, right: 0 }}>
+                                  <div className={`string-metal absolute ${stringAnchorClass} h-0.5 w-16`} />
+                                  <div className={`absolute ${pegSideClass} -translate-y-1/2`}>
+                                    <div className="w-4 h-4 rounded-full shadow bg-gradient-to-br from-[#e8dcc0] to-[#8f8468]" />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className={`absolute ${labelSideClass} -translate-y-1/2 px-2.5 py-0.5 text-xs font-bold rounded-full border ${pillClass}`}
+                                    onClick={() => {
+                                      setSelectedString(p.idx);
+                                      playStringSound(p.idx);
+                                    }}
+                                  >
+                                    {open}
+                                  </button>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
+                      <div className="text-xs text-[#6e6353] leading-relaxed">
+                        Tap a string to hear its reference tone. Hold a string in tune for 3 seconds to lock it in.
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* ---------------- Jam Mode ---------------- */}
+              {page === 'Jam Mode' && (
+                <div className="max-w-5xl mx-auto px-8 py-10">
+                  <div className="text-2xl font-extrabold text-[#f5e9d0] mb-6">Jam Mode</div>
+
+                  {isCountdownActive && countdown !== null && (
+                    <div className="fixed inset-0 z-40 pointer-events-none flex items-center justify-center">
+                      <div className="text-[8rem] md:text-[10rem] font-black text-[#fbbf24] [text-shadow:0_0_60px_rgba(245,158,11,.6)]">
+                        {countdown}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="fl-panel p-5">
+                      <div className="fl-label mb-2">Key</div>
+                      <select
+                        value={selectedKey}
+                        onChange={(e) => setSelectedKey(e.target.value)}
+                        className="fl-input w-full h-10 px-3 text-sm"
+                        disabled={isRecording || isCountdownActive}
+                      >
+                        {noteNames.map((key) => <option key={key} value={key}>{key}</option>)}
+                      </select>
+                      <div className="fl-label mt-5 mb-2">Chord progression</div>
+                      <select
+                        value={selectedProgression ?? ''}
+                        onChange={(e) => setSelectedProgression(e.target.value === '' ? null : parseInt(e.target.value))}
+                        className="fl-input w-full h-10 px-3 text-sm"
+                      >
+                        <option value="">None</option>
+                        {chordProgressions.map((prog, idx) => <option key={idx} value={idx}>{prog.name}</option>)}
+                      </select>
+                      {selectedProgression !== null && chordProgressions[selectedProgression].romans.length > 0 && (
+                        <div className="mt-3.5 flex flex-wrap gap-2">
+                          {chordsForProgression(selectedKey, chordProgressions[selectedProgression].romans).map((chord, idx) => (
+                            <div key={idx} className="fl-card px-3.5 py-1.5 font-bold text-[#f5e9d0] text-sm">
+                              {chord}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="fl-panel p-5">
+                      <div className="fl-label mb-3">Click track</div>
+                      <div className="flex items-center gap-4 mb-4">
+                        <Knob value={bpm} min={20} max={300} />
+                        <input
+                          type="number" min={20} max={300} value={bpm}
+                          onChange={(e) => {
+                            const v = Math.max(20, Math.min(300, Number(e.target.value) || 0));
+                            setBpm(v);
+                          }}
+                          className="fl-input h-10 w-24 px-3 text-sm text-center font-semibold"
+                        />
+                        <div className="fl-switch h-9 items-center">
+                          <button className={`px-4 h-full text-xs ${isMetronomeEnabled ? 'on' : ''}`} onClick={() => setIsMetronomeEnabled(true)}>On</button>
+                          <button className={`px-4 h-full text-xs ${!isMetronomeEnabled ? 'on' : ''}`} onClick={() => setIsMetronomeEnabled(false)}>Off</button>
+                        </div>
+                      </div>
+                      <div className="text-sm text-[#a89a86]">1 bar count-in at {bpm} BPM{isMetronomeEnabled ? ', click while recording' : ''}.</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 w-full max-w-2xl mx-auto text-center h-5">
+                    {isLoopProcessing && (
+                      <div className="text-sm font-bold text-[#fbbf24]">Quantizing…</div>
+                    )}
+                    {!isLoopProcessing && loopQuantizeInfo && (
+                      <div className="text-sm text-[#a89a86]">
+                        {loopQuantizeInfo.beats} beat{loopQuantizeInfo.beats === 1 ? '' : 's'} @ {loopQuantizeInfo.bpm} BPM
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-6 flex flex-col items-center">
+                    <button
+                      onClick={() => (isRecording || isCountdownActive) ? stopRecording() : startRecording()}
+                      className={`h-12 px-8 rounded-[10px] text-[15px] ${(isRecording || isCountdownActive) ? 'fl-btn-danger' : 'fl-btn-primary'}`}
+                      disabled={isCropping || isLoopProcessing}
+                    >
+                      {isCountdownActive ? '⏹ Cancel countdown' : isRecording ? '⏹ Stop recording' : '● Start recording'}
+                    </button>
+
+                    <div className="mt-4 flex flex-wrap justify-center items-center gap-2.5">
+                      <button
+                        onClick={() => isPlaying ? stopPlayback() : playRecordedAudio()}
+                        disabled={!recordedAudio}
+                        className={`h-10 px-5 rounded-lg ${isPlaying ? 'fl-btn-danger' : 'fl-btn'}`}
+                      >
+                        {isPlaying ? '⏸ Stop' : '▶ Play'}
+                      </button>
+                      <button
+                        onClick={() => { const nl = !isLooping; setIsLooping(nl); jamModeRef.current.shouldLoop = nl; }}
+                        disabled={!recordedAudio}
+                        className={`h-10 px-5 rounded-lg ${isLooping ? 'fl-btn-primary' : 'fl-btn'}`}
+                      >
+                        {isLooping ? '🔁 Looping' : '🔁 Loop'}
+                      </button>
+                      <button
+                        onClick={() => setShowCropUI(!showCropUI)}
+                        disabled={!recordedAudio}
+                        className={`h-10 px-5 rounded-lg ${showCropUI ? 'fl-btn-primary' : 'fl-btn'}`}
+                      >
+                        ✂ Edit
+                      </button>
+                      <button
+                        onClick={() => saveLoopToDb()}
+                        disabled={!recordedAudio}
+                        className="fl-btn h-10 px-5 rounded-lg"
+                      >
+                        💾 Save loop
+                      </button>
+                    </div>
+                  </div>
+
+                  {showCropUI && recordedAudio && (
+                    <div className="fl-panel p-5 mt-6 max-w-3xl mx-auto w-full">
+                      <div className="font-extrabold text-[#f5e9d0] mb-1">Trim loop</div>
+                      <div className="text-xs mb-3 text-[#6e6353]">Drag the handles to trim, drag the middle to move the selection.</div>
+
+                      <div className="rounded-lg p-3 bg-[#141110] border border-[#332b22]">
+                        <canvas id="waveform-canvas" width="800" height="140" className="w-full h-[140px] rounded bg-transparent cursor-pointer select-none touch-none" />
+                      </div>
+
+                      <div className="flex items-center gap-3 mt-4">
+                        <button onClick={cropAudio} disabled={isCropping || isRecording} className="fl-btn-primary h-10 px-5 text-sm">
+                          {isCropping ? 'Trimming…' : '✂ Apply trim'}
+                        </button>
+                        <button onClick={undoTrim} disabled={undoStack.length === 0 || isCropping || isRecording} className="fl-btn h-10 px-5 text-sm">
+                          ↺ Undo
+                        </button>
+                        <div className="text-sm text-[#a89a86] ml-auto">Duration: {audioDuration.toFixed(2)}s</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {savedLoops && savedLoops.length > 0 && (
+                    <div className="mt-8">
+                      <div className="font-extrabold text-[#f5e9d0] mb-3">Saved loops</div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {savedLoops.map(loop => (
+                          <div key={loop.id} className="fl-card p-3.5 flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-bold text-sm text-[#f5e9d0] truncate">{loop.name || 'Untitled loop'}</div>
+                              <div className="text-xs text-[#a89a86] mt-0.5">
+                                {loop.progressionName ? `${loop.progressionName} • ` : ''}Key {loop.key} • {loop.bpm} BPM
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button onClick={() => loadLoop(loop.id)} className="fl-btn h-9 px-3.5 text-[13px]">Load</button>
+                              <button onClick={() => deleteLoop(loop.id)} className="fl-btn-danger h-9 px-3.5 text-[13px]">Delete</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ---------------- About ---------------- */}
+              {page === 'About' && (
+                <div className="max-w-3xl mx-auto px-8 py-10">
+                  <div className="text-2xl font-extrabold text-[#f5e9d0] mb-5">About</div>
+                  <div className="fl-panel p-6 space-y-4 text-[#a89a86] leading-relaxed relative">
+                    <span className="screw" style={{ top: 10, left: 10 }} />
+                    <span className="screw" style={{ top: 10, right: 10 }} />
+                    <span className="screw" style={{ bottom: 10, left: 10 }} />
+                    <span className="screw" style={{ bottom: 10, right: 10 }} />
+                    <p>
+                      FretLab is a free, browser-based practice studio for guitarists. Visualize any scale or
+                      diatonic chord across the full neck, tune up with the chromatic tuner, and record
+                      quantized practice loops in Jam Mode — no installs, no accounts.
+                    </p>
+                    <p className="text-[#f5e9d0] font-semibold">Built by Nathan Kwon.</p>
+                  </div>
+                </div>
+              )}
             </div>
-            )}
           </div>
         );
       };
