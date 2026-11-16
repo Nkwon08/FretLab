@@ -104,7 +104,7 @@
       .note-root-glow { box-shadow: 0 0 0 2px #262d27, 0 0 0 3px var(--amber) !important; }
       .fret-position { border: 0; padding: 0; background: transparent; color: inherit; }
       .fret-position:focus-visible { outline-offset: -3px; z-index: 25; }
-      .fret-position[aria-pressed=true] { background: #d6b57718; }
+      
       .fret-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; color: var(--muted); font-size: 11px; margin: 8px 0 24px; }
       .legend-item { display: inline-flex; align-items: center; gap: 6px; }
       .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
@@ -192,6 +192,25 @@
       }
       .fretboard-focus.is-expanded .wood > div {
         height: clamp(44px, 9vh, 84px);
+      }
+
+      .fretboard-focus .drawing-toolbar {
+        flex-shrink: 0; margin-bottom: 0; padding: 12px 0;
+        border: 0; border-bottom: 1px solid var(--border);
+        border-radius: 0;
+      }
+      .fret-position[aria-disabled="true"] { cursor: default; }
+      .fret-position[aria-disabled="false"] { cursor: pointer; }
+      .fret-position .note-selected {
+        outline: 2px solid var(--amber); outline-offset: 3px;
+        box-shadow: 0 0 0 3px var(--bg) !important;
+      }
+      .note-selection-check {
+        position: absolute; top: -5px; right: -5px;
+        width: 14px; height: 14px; display: grid;
+        place-items: center; border-radius: 50%;
+        background: var(--amber); color: #171918;
+        font-size: 10px; line-height: 1;
       }
     </style>
   </head>
@@ -428,7 +447,7 @@
         const [selectedChord, setSelectedChord] = useState(null);
         const [startFret, setStartFret] = useState(1);
         const [endFret, setEndFret] = useState(21);
-        const [drawingMode, setDrawingMode] = useState(null);
+        const [isSelecting, setIsSelecting] = useState(false);
         const [drawings, setDrawings] = useState({});
         const [savedDrawings, setSavedDrawings] = useState([]);
         const [page, setPage] = useState('Home');
@@ -2068,7 +2087,7 @@
         const handleSaveDrawing = () => {
           const hasMarks = drawings && Object.keys(drawings).length > 0;
           if (!hasMarks) {
-            alert('Draw on the fretboard before saving.');
+            alert('Select notes on the fretboard before saving.');
             return;
           }
           const defaultLabel = `${rootNote} ${scaleNames[scaleType] || ''}`.trim() || 'Fretboard Sketch';
@@ -2350,33 +2369,6 @@
                     </div>
 
                     </div>
-                  <div className="drawing-toolbar"><span className="toolbar-hint">{drawingMode === 'draw' ? 'Select positions to mark your pattern' : drawingMode === 'erase' ? 'Select marks to erase them' : 'Mark a pattern on the neck'}</span>
-                      <button
-                        onClick={() => setDrawingMode(drawingMode === 'draw' ? null : 'draw')}
-                        className={`h-9 px-3.5 text-[13px] rounded ${drawingMode === 'draw' ? 'fl-btn-primary' : 'fl-btn'}`}
-                        aria-pressed={drawingMode === 'draw'} title="Draw on the fretboard"
-                      >
-                        Draw
-                      </button>
-                      <button
-                        onClick={() => setDrawingMode(drawingMode === 'erase' ? null : 'erase')}
-                        className={`h-9 px-3.5 text-[13px] rounded ${drawingMode === 'erase' ? 'fl-btn-danger' : 'fl-btn'}`}
-                        aria-pressed={drawingMode === 'erase'} title="Erase marks"
-                      >
-                        Erase
-                      </button>
-                      <button
-                        onClick={handleSaveDrawing}
-                        disabled={!hasActiveDrawing}
-                        className="fl-btn-primary h-9 px-3.5 text-[13px]"
-                        title="Save current diagram"
-                      >
-                        Save
-                      </button>
-                      <button onClick={() => setDrawings({})} className="fl-btn h-9 px-3.5 text-[13px]" title="Clear all marks">
-                        Clear
-                      </button>
-                  </div>
                   <details className="display-options">
                     <summary>Note appearance</summary>
                     <div className="display-options-content">
@@ -2395,6 +2387,33 @@
 
                   {/* Fretboard */}
                   <FretboardFocus title={`${rootNote} ${scaleNames[scaleType]}`}>
+
+                  <div className="drawing-toolbar">
+                    <span className="toolbar-hint" role="status">
+                      {isSelecting
+                        ? 'Click a note to select or deselect it.'
+                        : 'Turn on Select to choose notes.'}
+                      {' '}{Object.keys(drawings).length} selected
+                    </span>
+                    <button onClick={handleSaveDrawing}
+                      disabled={!hasActiveDrawing}
+                      className="fl-btn h-9 px-3.5 text-[13px]"
+                      title="Save selected notes">
+                      Save
+                    </button>
+                    <button onClick={() => setIsSelecting(value => !value)}
+                      className={`h-9 px-3.5 text-[13px] ${isSelecting ? 'fl-btn-primary' : 'fl-btn'}`}
+                      aria-pressed={isSelecting}
+                      title="Toggle note selection">
+                      Select
+                    </button>
+                    <button onClick={() => setDrawings({})}
+                      className="fl-btn h-9 px-3.5 text-[13px]"
+                      title="Deselect all notes">
+                      Clear
+                    </button>
+                  </div>
+
                   <div className="fretboard-surface" tabIndex={0} role="region" aria-label="Guitar fretboard. Scroll horizontally to see all frets.">
                     <div style={{ minWidth: Math.max(340, visibleFretCount * 46 + 48) }}>
                       <div className="flex mb-2.5 pl-12">
@@ -2433,32 +2452,33 @@
 
                                 const drawKey = `${stringIndex}-${fretNum}`;
                                 const isDrawn = drawings[drawKey];
+                                const isVisibleNote = selectedChord
+                                  ? isToneInChord(noteIndex) : inScale;
 
                                 return (
                                   <button type="button"
                                     key={fret}
-                                    aria-label={`String ${string.name}, fret ${fretNum}, ${noteNames[noteIndex]}${isDrawn ? ', marked' : ''}`}
+                                    aria-label={`String ${string.name}, fret ${fretNum}, ${noteNames[noteIndex]}${isDrawn ? ', selected' : ''}`}
                                     aria-pressed={Boolean(isDrawn)}
-                                    tabIndex={drawingMode ? 0 : -1}
+                                    tabIndex={isSelecting && isVisibleNote ? 0 : -1}
+                                    aria-disabled={!isSelecting || !isVisibleNote}
                                     className="fret-position h-full flex items-center justify-center relative"
                                     style={{ width: `${100 / visibleFretCount}%` }}
                                     onMouseEnter={() => setHoveredNote(drawKey)}
                                     onMouseLeave={() => setHoveredNote(null)}
                                     onClick={() => {
-                                      if (drawingMode === 'draw') {
-                                        setDrawings({ ...drawings, [drawKey]: true });
-                                      } else if (drawingMode === 'erase') {
-                                        const newDrawings = { ...drawings };
-                                        delete newDrawings[drawKey];
-                                        setDrawings(newDrawings);
-                                      }
+                                      if (!isSelecting || !isVisibleNote) return;
+                                      setDrawings(previous => {
+                                        const next = { ...previous };
+                                        if (next[drawKey]) delete next[drawKey];
+                                        else next[drawKey] = true;
+                                        return next;
+                                      });
                                     }}
                                   >
                                     <div className="fret-wire absolute left-0 top-0 bottom-0"></div>
 
-                                    {isDrawn && (
-                                      <div className="absolute inset-1 border-[3px] border-[#fcd34d] rounded pointer-events-none z-20 " />
-                                    )}
+
 
                                     {(() => {
                                       if (selectedChord) {
@@ -2483,13 +2503,14 @@
 
                                       return (
                                         <div
-                                          className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-semibold cursor-default transition-transform  ${glow ? 'note-root-glow' : ''} ${isHovered ? 'scale-110' : ''}`}
+                                          className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-semibold transition-transform  ${isDrawn ? 'note-selected' : glow ? 'note-root-glow' : ''} ${isHovered ? 'scale-110' : ''}`}
                                           style={{
                                             backgroundColor: bgColor,
                                             color: isLightColor(bgColor) ? '#2b1f10' : '#fff8ec'
                                           }}
                                         >
                                           {showDegrees ? formatDegree(degree, noteIndex) : noteNames[noteIndex]}
+                                          {isDrawn && <span className="note-selection-check" aria-hidden="true">✓</span>}
                                         </div>
                                       );
                                     })()}
@@ -2571,7 +2592,7 @@
                       <div className="text-xs text-[#929e92]">Tap a saved set to load it.</div>
                     </div>
                     {savedDrawings.length === 0 ? (
-                      <div className="text-sm text-[#b1b9af]">No saved notes yet. Draw on the board, then hit Save.</div>
+                      <div className="text-sm text-[#b1b9af]">No saved notes yet. Turn on Select, choose notes, then press Save.</div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {savedDrawings.map((preset) => {
