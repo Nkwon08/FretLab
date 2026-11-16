@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FretLab — Guitar Scale & Chord Explorer</title>
     <meta name="description" content="FretLab is an interactive guitar practice studio: explore scales and diatonic chords on a full 21-fret fretboard, tune up with the built-in chromatic tuner, and record quantized loops in Jam Mode." />
-    <meta name="theme-color" content="#151210" />
+    <meta name="theme-color" content="#171918" />
     <meta property="og:title" content="FretLab — Guitar Scale & Chord Explorer" />
     <meta property="og:description" content="Explore scales and chords on an interactive fretboard, tune your guitar, and record practice loops — all in the browser." />
     <meta property="og:type" content="website" />
@@ -16,58 +16,156 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       :root {
-        --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji';
-        --bg: #151210; --panel: #1d1915; --panel2: #26211b;
-        --border: #332b22; --border2: #453a2d;
-        --text: #efe7da; --muted: #a89a86; --faint: #6e6353;
-        --amber: #f59e0b; --amber2: #fbbf24; --cream: #f5e9d0;
+        color-scheme: dark;
+        --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+        --bg: #171918; --panel: #202321; --panel2: #252925;
+        --border: #343a35; --border2: #454d46;
+        --text: #eceee8; --muted: #b1b9af; --faint: #929e92;
+        --amber: #d6b577; --amber2: #e0c48e; --cream: #eceee8;
       }
-      html, body { font-family: var(--font-sans); background: var(--bg); color: var(--text); }
-      body {
-        background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(245, 158, 11, .06), transparent);
-        background-attachment: fixed;
-      }
-
-      /* Amp-room design system */
-      .fl-panel {
-        background: linear-gradient(180deg, var(--panel2), var(--panel));
-        border: 1px solid var(--border2); border-radius: 14px;
-        box-shadow: 0 4px 18px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .04);
-      }
-      .fl-card { background: var(--panel); border: 1px solid var(--border2); border-radius: 12px; box-shadow: 0 3px 10px rgba(0, 0, 0, .3); }
-      .fl-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--faint); font-weight: 700; }
-      .fl-input { background: #141110; border: 1px solid var(--border2); color: var(--text); border-radius: 8px; outline: none; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; font-family: var(--font-sans); background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+      button, input, select { font: inherit; }
+      button { touch-action: manipulation; }
+      button, a, input, select, summary { -webkit-tap-highlight-color: transparent; }
+      :focus-visible { outline: 2px solid var(--amber2); outline-offset: 4px; }
+      ::selection { background: #d6b577; color: #171918; }
+      .fl-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; }
+      .fl-card { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; }
+      .fl-label { font-size: 11px; line-height: 1.5; letter-spacing: .06em; color: var(--muted); font-weight: 600; text-transform: uppercase; }
+      .fl-input { background: var(--bg); border: 1px solid var(--border2); color: var(--text); border-radius: 4px; min-height: 38px; }
       .fl-input:focus { border-color: var(--amber); }
-      .fl-btn { background: #141110; border: 1px solid var(--border2); color: var(--muted); border-radius: 8px; font-weight: 600; cursor: pointer; transition: color .15s, border-color .15s; }
-      .fl-btn:hover:not(:disabled) { color: var(--text); border-color: #5a4c39; }
-      .fl-btn:disabled { opacity: .45; cursor: not-allowed; }
-      .fl-btn-primary { background: linear-gradient(180deg, #fbbf24, #d97706); color: #2b1a05; border: 1px solid #b45309; border-radius: 8px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(245, 158, 11, .3); }
-      .fl-btn-primary:hover:not(:disabled) { filter: brightness(1.07); }
-      .fl-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-      .fl-btn-danger { background: linear-gradient(180deg, #f87356, #c2410c); color: #fff7ed; border: 1px solid #9a3412; border-radius: 8px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(194, 65, 12, .35); }
-      .fl-btn-danger:hover:not(:disabled) { filter: brightness(1.07); }
-      .fl-switch { display: inline-flex; border: 1px solid var(--border2); border-radius: 20px; overflow: hidden; background: #141110; }
-      .fl-switch button { border: none; background: transparent; color: var(--muted); font-weight: 600; cursor: pointer; font-family: inherit; }
-      .fl-switch button.on { background: var(--amber); color: #2b1a05; }
+      .fl-btn, .fl-btn-primary, .fl-btn-danger { border-radius: 4px; font-weight: 600; cursor: pointer; min-height: 36px; transition: background .15s, border-color .15s, color .15s; }
+      .fl-btn { background: transparent; border: 1px solid var(--border2); color: var(--text); }
+      .fl-btn:hover:not(:disabled) { background: #303630; border-color: #798879; }
+      .fl-btn-primary { background: var(--amber); color: #252116; border: 1px solid var(--amber); }
+      .fl-btn-primary:hover:not(:disabled) { background: var(--amber2); border-color: var(--amber2); }
+      .fl-btn-danger { background: #432b2a; color: #ffb6a8; border: 1px solid #89584f; }
+      .fl-btn-danger:hover:not(:disabled) { background: #583632; }
+      button:disabled { opacity: .45; cursor: not-allowed; }
+      .fl-switch { display: inline-flex; border: 1px solid var(--border2); border-radius: 4px; overflow: hidden; background: var(--bg); min-height: 38px; }
+      .fl-switch button { border: none; background: transparent; color: var(--muted); font-weight: 500; cursor: pointer; }
+      .fl-switch button:hover { color: var(--text); background: #303630; }
+      .fl-switch button.on { background: #3a4239; color: #f1f3eb; }
+      .fl-switch button:focus-visible { outline-offset: -3px; }
+      .app-nav { position: fixed; inset: 0 auto 0 0; width: 184px; padding: 24px 12px 16px; background: #121513; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; z-index: 40; }
+      .brand { display: flex; align-items: center; gap: 10px; padding: 0 10px 30px; font-size: 19px; font-weight: 600; letter-spacing: -.04em; }
+      .brand-mark { width: 28px; height: 30px; color: var(--amber); display: grid; place-items: center; border-left: 3px solid var(--amber); border-right: 1px solid #6b624e; }
+      .nav-section { padding: 0 12px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--faint); }
+      .rail-btn { display: flex; align-items: center; gap: 12px; padding: 12px; width: 100%; color: var(--muted); border-radius: 4px; text-align: left; font-size: 13px; transition: color .15s, background .15s; }
+      .rail-btn svg { width: 18px; height: 18px; flex: none; stroke-width: 1.6; }
+      .rail-btn:hover { background: #252c26; color: var(--text); }
+      .rail-btn.active { background: #2c332b; color: #e0c48e; box-shadow: inset 2px 0 var(--amber); }
+      .nav-spacer { flex: 1; }
+      .nav-foot { margin: 16px 12px 0; padding-top: 16px; border-top: 1px solid var(--border); font-size: 11px; color: var(--faint); }
+      .app-shell { margin-left: 184px; min-width: 0; }
+      .app-header { min-height: 64px; padding: 16px 32px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+      .header-context { color: var(--muted); font-size: 12px; }
+      .status { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--muted); }
+      .led { width: 6px; height: 6px; border-radius: 50%; background: #a5bb95; flex-shrink: 0; }
+      .led.rec { background: #f18d7d; }
+      .page { width: 100%; max-width: 1440px; padding: 32px; margin: 0 auto; }
+      .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 24px; flex-wrap: wrap; }
+      h1, .page-title { font-size: 26px; font-weight: 600; line-height: 1.25; letter-spacing: -.035em; }
+      .page-description { color: var(--muted); font-size: 13px; margin-top: 8px; max-width: 560px; }
+      .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--amber); margin-bottom: 12px; }
+      .home-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(240px, 1fr); gap: 32px; }
+      .session-board { background: var(--panel); border: 1px solid var(--border); border-top: 2px solid var(--amber); padding: 28px; border-radius: 4px; }
+      .session-title { font-size: 32px; font-weight: 500; letter-spacing: -.04em; margin: 12px 0 8px; }
+      .scale-strip { display: flex; flex-wrap: wrap; gap: 8px; margin: 28px 0; }
+      .scale-strip span { display: grid; place-items: center; min-width: 36px; height: 40px; border-bottom: 2px solid var(--border2); font-size: 15px; }
+      .scale-strip span:first-child { color: var(--amber2); border-color: var(--amber); }
+      .session-meta { display: flex; gap: 24px; color: var(--muted); font-size: 12px; margin-bottom: 24px; }
+      .tool-row { width: 100%; display: flex; text-align: left; align-items: center; gap: 16px; padding: 24px 0; border-bottom: 1px solid var(--border); }
+      .tool-row:first-child { padding-top: 0; }
+      .tool-row:hover .tool-title { color: var(--amber2); }
+      .tool-number { color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+      .tool-title { font-size: 17px; font-weight: 500; transition: color .15s; }
+      .tool-copy { font-size: 12px; color: var(--muted); line-height: 1.7; margin-top: 6px; }
+      .tool-arrow { margin-left: auto; color: var(--amber); }
+      .session-footer { margin-top: 32px; border-top: 1px solid var(--border); padding-top: 20px; display: flex; flex-wrap: wrap; gap: 12px 32px; color: var(--faint); font-size: 12px; }
+      .control-deck { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; padding: 18px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px 6px 0 0; }
+      .control-divider { width: 1px; height: 56px; background: var(--border); }
+      .tempo-control { display: flex; align-items: flex-end; gap: 8px; margin-left: auto; }
+      .tempo-control .knob { display: none; }
+      .tempo-control > div:first-child { align-self: center; }
+      .tempo-control > div:last-child { flex-direction: row; align-items: center; }
+      .drawing-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 18px; border: 1px solid var(--border); border-top: 0; margin-bottom: 20px; border-radius: 0 0 6px 6px; }
+      .toolbar-hint { margin-right: auto; color: var(--muted); font-size: 12px; }
+      .display-options { margin-bottom: 20px; color: var(--muted); font-size: 12px; }
+      .display-options summary { width: fit-content; cursor: pointer; padding: 8px 0; }
+      .display-options-content { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding: 12px 0; }
+      .fretboard-surface { padding: 20px 0; overflow-x: auto; overscroll-behavior-x: contain; }
+      .fretboard-surface:focus-visible { outline-offset: -2px; }
+      .wood { background: #262d27; border-radius: 4px; }
+      .fret-wire { background: #697568; width: 1px; }
+      .string-metal { background: #83907e; opacity: .65; }
+      .inlay-pearl { background: #a8b39f; opacity: .25; }
+      .note-root-glow { box-shadow: 0 0 0 2px #262d27, 0 0 0 3px var(--amber) !important; }
+      .fret-position { border: 0; padding: 0; background: transparent; color: inherit; }
+      .fret-position:focus-visible { outline-offset: -3px; z-index: 25; }
+      .fret-position[aria-pressed=true] { background: #d6b57718; }
+      .fret-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; color: var(--muted); font-size: 11px; margin: 8px 0 24px; }
+      .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+      .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+      .chord-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; }
+      .chord-option { text-align: left; padding: 12px; min-width: 0; }
+      .chord-option:hover { background: #2d342c; border-color: #798879; }
+      .chord-option[aria-pressed=true] { border-color: var(--amber); background: #303329; }
+      .saved-section { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); }
+      .saved-pattern { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); }
+      .saved-pattern > button:first-child { text-align: left; min-width: 0; flex: 1; padding: 12px 0; }
+      .knob { border-radius: 50%; background: #30372e; border: 1px solid #64715e; position: relative; }
+      .knob-needle { position: absolute; top: 4px; left: 50%; width: 2px; height: 12px; background: var(--amber2); transform-origin: 50% 18px; }
+      .tuner-workspace { padding: 28px; display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(230px, 1fr); gap: 32px; }
+      .tuner-settings { border-left: 1px solid var(--border); padding-left: 28px; }
+      .string-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0; }
+      .string-key { padding: 12px 6px; border: 1px solid var(--border2); border-radius: 4px; text-align: center; }
+      .string-key[aria-pressed=true] { border-color: var(--amber); background: #383a2c; }
+      .string-key:hover { background: #30372e; }
+      .string-key small { display: block; color: var(--muted); font-size: 10px; margin-bottom: 4px; }
+      .string-key strong { font-size: 21px; font-weight: 500; }
+      .jam-settings { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); }
+      .jam-settings > section { padding: 24px; }
+      .jam-settings > section + section { border-left: 1px solid var(--border); }
+      .transport { margin-top: 24px; padding: 24px; background: #121513; border: 1px solid var(--border); border-radius: 6px; }
+      .transport-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+      .transport-secondary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+      .empty-state { padding: 24px 0; color: var(--muted); font-size: 13px; }
+      .about-copy { max-width: 680px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--muted); line-height: 1.8; }
+      .skip-link { position: fixed; top: -100px; left: 16px; z-index: 100; padding: 12px 18px; background: var(--amber); color: #171918; }
+      .skip-link:focus { top: 12px; }
 
-      .rail-btn { color: var(--faint); border-radius: 10px; position: relative; transition: color .15s, background .15s; }
-      .rail-btn:hover { background: #1d1813; color: var(--muted); }
-      .rail-btn.active { background: #241d14; color: var(--amber2); }
-      .rail-btn.active::before { content: ''; position: absolute; left: -10px; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: var(--amber); box-shadow: 0 0 8px rgba(245, 158, 11, .6); }
-      .brand-mark { background: radial-gradient(circle at 35% 30%, #fbbf24, #b45309); box-shadow: inset 0 -2px 5px rgba(0, 0, 0, .4), 0 0 14px rgba(245, 158, 11, .35); }
-      .led { width: 9px; height: 9px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 8px rgba(74, 222, 128, .7); }
-      .led.rec { background: #f87171; box-shadow: 0 0 8px rgba(248, 113, 113, .8); }
-
-      .wood { background: linear-gradient(180deg, #43301f 0%, #38271a 30%, #2e2015 70%, #271b12 100%); box-shadow: inset 0 2px 8px rgba(0, 0, 0, .5); }
-      .fret-wire { background: linear-gradient(90deg, #c9a45e, #7d6236); box-shadow: 1px 0 2px rgba(0, 0, 0, .5); }
-      .string-metal { background: linear-gradient(180deg, #e8dcc0, #8f8468); box-shadow: 0 1px 2px rgba(0, 0, 0, .6); }
-      .inlay-pearl { background: radial-gradient(circle at 35% 30%, #fdf6e3, #b9ab8d); opacity: .5; }
-      .note-root-glow { box-shadow: 0 0 12px rgba(245, 158, 11, .55), 0 2px 6px rgba(0, 0, 0, .5) !important; }
-
-      .knob { border-radius: 50%; background: radial-gradient(circle at 35% 30%, #4a3f31, #241d15); border: 1px solid var(--border2); box-shadow: inset 0 2px 4px rgba(255, 255, 255, .06), 0 3px 8px rgba(0, 0, 0, .5); position: relative; }
-      .knob-needle { position: absolute; top: 4px; left: 50%; width: 3px; height: 12px; background: var(--amber2); border-radius: 2px; transform-origin: 50% 18px; box-shadow: 0 0 5px rgba(251, 191, 36, .7); }
-
-      .screw { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #7a6c56, #3a3128); }
+      @media (min-width: 1600px) { .page { padding-top: 40px; } }
+      @media (max-width: 1100px) {
+        .app-nav { width: 156px; } .app-shell { margin-left: 156px; }
+        .page { padding: 24px; } .app-header { padding-inline: 24px; }
+        .home-layout { gap: 24px; } .control-divider { display: none; }
+        .tempo-control { margin-left: 0; }
+      }
+      @media (max-width: 760px) {
+        .app-nav { inset: auto 0 0; width: auto; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); flex-direction: row; border-right: 0; border-top: 1px solid var(--border); }
+        .brand, .nav-section, .nav-spacer, .nav-foot { display: none; }
+        .rail-btn { flex: 1; justify-content: center; flex-direction: column; gap: 5px; padding: 9px 2px; font-size: 10px; }
+        .rail-btn.active { box-shadow: inset 0 2px var(--amber); }
+        .app-shell { margin-left: 0; padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+        .app-header { min-height: 54px; padding: 14px 20px; } .header-context { display: none; }
+        .page { padding: 24px 20px; } h1, .page-title { font-size: 24px; }
+        .home-layout, .tuner-workspace, .jam-settings { grid-template-columns: 1fr; }
+        .session-board { padding: 22px; } .session-title { font-size: 28px; }
+        .tool-row:first-child { padding-top: 12px; }
+        .tuner-workspace { padding: 20px; } .tuner-settings { border-left: 0; border-top: 1px solid var(--border); padding: 24px 0 0; }
+        .jam-settings > section + section { border-left: 0; border-top: 1px solid var(--border); }
+        .jam-settings > section, .transport { padding: 18px; }
+        .control-deck { gap: 16px 12px; padding: 16px; }
+        .control-deck > div:not(.tempo-control):not(.control-divider) { flex: 1 1 110px; min-width: max-content; }
+        .drawing-toolbar { padding: 12px; } .toolbar-hint { flex-basis: 100%; }
+        .fl-input, .fl-btn, .fl-btn-primary, .fl-btn-danger, .fl-switch { min-height: 44px; }
+        .chord-grid { grid-template-columns: repeat(auto-fit, minmax(86px, 1fr)); }
+        .transport-controls > button { width: 100%; }
+        .transport-secondary { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+      }
+      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
     </style>
   </head>
   <body class="antialiased">
@@ -180,8 +278,8 @@
         const [scaleType, setScaleType] = useState('major');
         const [showDegrees, setShowDegrees] = useState(false);
         const [hoveredNote, setHoveredNote] = useState(null);
-        const [rootColor, setRootColor] = useState('#f59e0b');
-        const [noteColor, setNoteColor] = useState('#f5e9d0');
+        const [rootColor, setRootColor] = useState('#d6b577');
+        const [noteColor, setNoteColor] = useState('#eceee8');
         const [thirdColor, setThirdColor] = useState('#d96d2f');
         const [chordType, setChordType] = useState('triads');
         const [selectedChord, setSelectedChord] = useState(null);
@@ -736,7 +834,7 @@
           audio.addEventListener('timeupdate', () => {
             setPlaybackTime(audio.currentTime);
           });
-          
+
           audio.onended = () => {
             setPlaybackTime(0);
             URL.revokeObjectURL(audioUrl);
@@ -752,21 +850,21 @@
               jamModeRef.current.sourceNode = null;
             }
           };
-          
+
           audio.onerror = () => {
             setPlaybackTime(0);
             URL.revokeObjectURL(audioUrl);
             setIsPlaying(false);
             jamModeRef.current.sourceNode = null;
           };
-          
+
           audio.play().catch(e => {
             console.error('Playback error:', e);
             setPlaybackTime(0);
             setIsPlaying(false);
             jamModeRef.current.sourceNode = null;
           });
-          
+
           jamModeRef.current.sourceNode = audio;
           setIsPlaying(true);
         };
@@ -884,10 +982,10 @@
 
         const cropAudio = async () => {
           if (!recordedAudio || audioDuration === 0) return;
-          
+
           const startTime = Math.max(0, Math.min(cropStart, audioDuration - 0.1));
           const endTime = Math.min(audioDuration, Math.max(cropEnd, startTime + 0.1));
-          
+
           if (endTime <= startTime) {
             alert('End time must be greater than start time');
             return;
@@ -900,7 +998,7 @@
             const response = await fetch(audioUrl);
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-            
+
             const sampleRate = audioBuffer.sampleRate;
             const startSample = Math.floor(startTime * sampleRate);
             const endSample = Math.floor(endTime * sampleRate);
@@ -911,7 +1009,7 @@
               length,
               sampleRate
             );
-            
+
             for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
               const oldData = audioBuffer.getChannelData(channel);
               const newData = croppedBuffer.getChannelData(channel);
@@ -972,10 +1070,10 @@
           const mid = Math.floor(height / 2);
           ctx.clearRect(0, 0, width, height);
 
-          ctx.fillStyle = '#141110';
+          ctx.fillStyle = '#191c19';
           ctx.fillRect(0, 0, width, height);
 
-          ctx.strokeStyle = '#453a2d';
+          ctx.strokeStyle = '#454d46';
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(0, mid);
@@ -994,7 +1092,7 @@
                 const x = Math.round((t / audioDuration) * width);
                 const isDownbeat = Math.abs((t / beatSeconds) - Math.round(t / beatSeconds)) < 0.01;
                 ctx.strokeStyle = isDownbeat
-                  ? ('#fbbf24')
+                  ? ('#e0c48e')
                   : ('#4a3e2e');
                 ctx.lineWidth = isDownbeat ? 1.5 : 0.5;
                 ctx.beginPath();
@@ -1036,12 +1134,12 @@
           ctx.fillStyle = 'rgba(245,158,11,0.16)';
           ctx.fillRect(selX1, 0, Math.max(2, selX2 - selX1), height);
 
-          ctx.strokeStyle = '#f59e0b';
+          ctx.strokeStyle = '#d6b577';
           ctx.lineWidth = 2;
           ctx.strokeRect(selX1, 0, Math.max(2, selX2 - selX1), height);
 
           const handleWidth = 8;
-          ctx.fillStyle = '#f59e0b';
+          ctx.fillStyle = '#d6b577';
           ctx.fillRect(selX1 - handleWidth / 2, 0, handleWidth, height);
           ctx.strokeStyle = '#b45309';
           ctx.lineWidth = 2;
@@ -1052,7 +1150,7 @@
             ctx.lineTo(selX1 + handleWidth / 2 - 2, yPos);
             ctx.stroke();
           }
-          ctx.fillStyle = '#f59e0b';
+          ctx.fillStyle = '#d6b577';
           ctx.fillRect(selX2 - handleWidth / 2, 0, handleWidth, height);
           ctx.strokeStyle = '#b45309';
           for (let i = 0; i < 3; i++) {
@@ -1098,10 +1196,10 @@
             const mid = Math.floor(height / 2);
             ctx.clearRect(0, 0, width, height);
 
-            ctx.fillStyle = '#141110';
+            ctx.fillStyle = '#191c19';
             ctx.fillRect(0, 0, width, height);
 
-            ctx.strokeStyle = '#453a2d';
+            ctx.strokeStyle = '#454d46';
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(0, mid);
@@ -1146,7 +1244,7 @@
             ctx.fillStyle = 'rgba(245,158,11,0.16)';
             ctx.fillRect(selX1, 0, Math.max(2, selX2 - selX1), height);
 
-            ctx.strokeStyle = '#f59e0b';
+            ctx.strokeStyle = '#d6b577';
             ctx.lineWidth = 2;
             ctx.strokeRect(selX1, 0, Math.max(2, selX2 - selX1), height);
 
@@ -1156,10 +1254,10 @@
               const playbackClamped = Math.max(0, Math.min(safeDuration, playbackPos));
               const playbackX = toX(playbackClamped);
 
-              ctx.fillStyle = '#f5e9d0';
+              ctx.fillStyle = '#eceee8';
               ctx.fillRect(playbackX - 2, 0, 4, height);
 
-              ctx.fillStyle = '#f5e9d0';
+              ctx.fillStyle = '#eceee8';
               ctx.beginPath();
               ctx.moveTo(playbackX - 6, 0);
               ctx.lineTo(playbackX + 6, 0);
@@ -1169,7 +1267,7 @@
             }
 
             const handleWidth = 8;
-            ctx.fillStyle = '#f59e0b';
+            ctx.fillStyle = '#d6b577';
             ctx.fillRect(selX1 - handleWidth / 2, 0, handleWidth, height);
             ctx.strokeStyle = '#b45309';
             ctx.lineWidth = 2;
@@ -1180,7 +1278,7 @@
               ctx.lineTo(selX1 + handleWidth / 2 - 2, yPos);
               ctx.stroke();
             }
-            ctx.fillStyle = '#f59e0b';
+            ctx.fillStyle = '#d6b577';
             ctx.fillRect(selX2 - handleWidth / 2, 0, handleWidth, height);
             ctx.strokeStyle = '#b45309';
             for (let i = 0; i < 3; i++) {
@@ -1191,7 +1289,7 @@
               ctx.stroke();
             }
           };
-          
+
           const onResize = () => {
             if (canvas) drawWaveformLocal();
           };
@@ -1202,7 +1300,7 @@
             const sec = (relX / rect.width) * duration;
             return Math.max(0, Math.min(duration, sec));
           };
-          
+
           const onDown = (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1222,7 +1320,7 @@
             const isNearStart = distToStart < handleHitWidth;
             const isNearEnd = distToEnd < handleHitWidth;
             const isInSelection = x >= startX && x <= endX && !isNearStart && !isNearEnd;
-            
+
             if (isNearStart && distToStart <= distToEnd) {
               waveformRef.current.dragging = 'start';
               waveformRef.current.dragStartX = x;
@@ -1252,7 +1350,7 @@
             down = true;
             canvas.setPointerCapture?.(e.pointerId || 0);
           };
-          
+
           const onMove = (e) => {
             if (!down || !waveformRef.current.dragging) return;
             e.preventDefault();
@@ -1265,7 +1363,7 @@
             const duration = Math.max(0.0001, cropBoundsRef.current.duration || audioDuration || 1);
             const currentStart = waveformRef.current.currentCropStart ?? cropBoundsRef.current.start;
             const currentEnd = waveformRef.current.currentCropEnd ?? cropBoundsRef.current.end;
-            
+
             if (waveformRef.current.dragging === 'start') {
               const endLimit = currentEnd ?? duration;
               const newStart = Math.max(0, Math.min(sec, endLimit - 0.05));
@@ -1311,7 +1409,7 @@
           canvas.style.userSelect = 'none';
           canvas.style.touchAction = 'none';
           canvas.style.cursor = 'pointer';
-          
+
           (async () => {
             await ensureWaveformBuffer();
             waveformRef.current.currentCropStart = cropStart;
@@ -1330,10 +1428,10 @@
             const startX = (currentStart / duration) * width;
             const endX = (currentEnd / duration) * width;
             const handleHitWidth = 25;
-            
+
             const distToStart = Math.abs(x - startX);
             const distToEnd = Math.abs(x - endX);
-            
+
             if (distToStart < handleHitWidth || distToEnd < handleHitWidth) {
               canvas.style.cursor = 'ew-resize';
             } else if (x >= startX && x <= endX) {
@@ -1882,13 +1980,13 @@
           const interval = scales[scaleType][degree - 1];
           const majorIntervals = scales.major;
           const majorIntervalForThisPosition = majorIntervals[Math.min(degree - 1, majorIntervals.length - 1)];
-          
+
           if (interval < majorIntervalForThisPosition) {
             return `${degree}♭`;
           } else if (interval > majorIntervalForThisPosition) {
             return `${degree}♯`;
           }
-          
+
           return degree;
         };
 
@@ -1962,163 +2060,107 @@
 
         return (
           <div className="min-h-screen">
-            {/* Icon rail navigation */}
-            <nav className="fixed top-0 bottom-0 left-0 w-16 bg-[#0f0d0b] border-r border-[#332b22] flex flex-col items-center py-4 gap-1.5 z-40">
-              <div className="brand-mark w-9 h-9 rounded-full grid place-items-center text-[#2b1a05] font-black text-[13px] mb-3 select-none">
-                FL
-              </div>
+            <a className="skip-link" href="#main-content">Skip to workspace</a>
+            <nav className="app-nav" aria-label="Main navigation">
+              <div className="brand"><span className="brand-mark" aria-hidden="true"><IconFret /></span>FretLab</div>
+              <div className="nav-section">Practice studio</div>
               {[
-                { key: 'Home', label: 'Home', Icon: IconHome },
+                { key: 'Home', label: 'Workspace', Icon: IconHome },
                 { key: 'FretBoard', label: 'Fretboard', Icon: IconFret },
                 { key: 'Tuner', label: 'Tuner', Icon: IconTuner },
                 { key: 'Jam Mode', label: 'Jam Mode', Icon: IconJam },
               ].map(({ key, label, Icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setPage(key)}
-                  className={`rail-btn w-11 h-11 grid place-items-center ${page === key ? 'active' : ''}`}
-                  title={label}
-                  aria-label={label}
-                >
-                  <Icon />
+                <button key={key} onClick={() => setPage(key)}
+                  className={`rail-btn ${page === key ? 'active' : ''}`}
+                  aria-current={page === key ? 'page' : undefined}>
+                  <Icon /><span>{label}</span>
                 </button>
               ))}
-              <div className="flex-1" />
-              <button
-                onClick={() => setPage('About')}
-                className={`rail-btn w-11 h-11 grid place-items-center ${page === 'About' ? 'active' : ''}`}
-                title="About"
-                aria-label="About"
-              >
-                <IconInfo />
-              </button>
+              <div className="nav-spacer" />
+              <button onClick={() => setPage('About')} className={`rail-btn ${page === 'About' ? 'active' : ''}`}
+                aria-current={page === 'About' ? 'page' : undefined}><IconInfo /><span>About</span></button>
+              <div className="nav-foot">A little practice, every day.</div>
             </nav>
-
-            <div className="ml-16">
-              {/* Top bar */}
-              <header className="h-14 flex items-center justify-between px-7 border-b border-[#332b22] bg-[#151210]/90">
-                <div className="flex items-baseline gap-2.5">
-                  <span className="font-extrabold text-[15px] tracking-tight">FretLab</span>
-                  <span className="text-[#6e6353]">/</span>
-                  <span className="text-[#a89a86] text-sm">{page === 'FretBoard' ? 'Fretboard' : page}</span>
-                </div>
-                <div className="flex items-center gap-5">
-                  {page === 'FretBoard' && (
-                    <div className="flex items-center gap-2 fl-card px-3.5 py-1.5 text-[13px] text-[#a89a86]">
-                      <span className="w-2 h-2 rounded-full bg-[#f59e0b] shadow-[0_0_8px_rgba(245,158,11,.7)]" />
-                      Current scale <b className="text-[#efe7da] font-semibold">{rootNote} {scaleNames[scaleType]}</b>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <span className={`led ${isRecording ? 'rec' : ''}`} />
-                    <span className="text-[11px] text-[#6e6353] uppercase tracking-widest font-bold">
-                      {isRecording ? 'Rec' : 'Ready'}
-                    </span>
-                  </div>
+            <div className="app-shell">
+              <header className="app-header">
+                <span className="text-sm font-medium">{page === 'Home' ? 'Workspace' : page === 'FretBoard' ? 'Fretboard' : page}</span>
+                <span className="header-context">Guitar practice studio</span>
+                <div className="status" role="status">
+                  <span className={`led ${isRecording ? 'rec' : ''}`} />
+                  <span>{isRecording ? 'Recording' : isCountdownActive ? 'Count-in' : isTunerOn ? 'Listening' : isPlaying ? 'Playing' : isMetronomeOn ? 'Metronome on' : 'Ready'}</span>
                 </div>
               </header>
-
+              <main id="main-content" tabIndex={-1}>
               {/* ---------------- Home ---------------- */}
               {page === 'Home' && (
-                <div className="max-w-5xl mx-auto px-8">
-                  <div className="pt-20 pb-11 text-center">
-                    <div className="inline-flex items-center gap-2 fl-card rounded-full px-4 py-1.5 text-[#fbbf24] text-xs font-bold tracking-widest uppercase mb-7">
-                      <span className="led" /> Plugged in &amp; ready
-                    </div>
-                    <h1 className="text-5xl md:text-[52px] font-black tracking-tight leading-[1.05] mb-4">
-                      Your practice room,<br />
-                      <em className="not-italic text-[#fbbf24] [text-shadow:0_0_24px_rgba(245,158,11,.4)]">always open.</em>
-                    </h1>
-                    <p className="text-[#a89a86] text-[17px] leading-relaxed max-w-xl mx-auto">
-                      FretLab puts a full fretboard atlas, a chromatic tuner, and a loop recorder on one
-                      workbench — so every practice session starts in seconds, right in the browser.
-                    </p>
-                    <div className="flex flex-wrap justify-center gap-3 mt-8">
-                      <button onClick={() => setPage('FretBoard')} className="fl-btn-primary h-11 px-7 rounded-[10px] text-[15px]">
-                        Open Fretboard
-                      </button>
-                      <button onClick={() => setPage('Tuner')} className="fl-btn h-11 px-7 rounded-[10px] text-[15px]">
-                        Tune Up
-                      </button>
-                      <button onClick={() => setPage('Jam Mode')} className="fl-btn h-11 px-7 rounded-[10px] text-[15px]">
-                        Jam
-                      </button>
-                    </div>
+                <div className="page">
+                  <div className="page-heading"><div>
+                    <div className="eyebrow">Your workspace</div>
+                    <h1>Make time to play.</h1>
+                    <p className="page-description">Explore the neck, find your pitch, or work out an idea.</p>
+                  </div></div>
+                  <div className="home-layout">
+                    <section className="session-board" aria-label="Current scale">
+                      <div className="fl-label">On your fretboard</div>
+                      <h2 className="session-title">{rootNote} {scaleNames[scaleType]}</h2>
+                      <p className="text-sm text-[#b1b9af]">Find the connections between notes and chords.</p>
+                      <div className="scale-strip" aria-label="Notes in the current scale">
+                        {getScaleNotes.map(pc => <span key={pc}>{noteNames[pc]}</span>)}
+                      </div>
+                      <div className="session-meta"><span>{getScaleNotes.length} notes</span><span>Frets {startFret}–{endFret}</span><span>{bpm} BPM</span></div>
+                      <button onClick={() => setPage('FretBoard')} className="fl-btn-primary h-11 px-5">Open fretboard <span aria-hidden="true">↗</span></button>
+                    </section>
+                    <section aria-label="Practice tools">
+                      {[
+                        { number: '01', title: 'Explore the fretboard', page: 'FretBoard', text: 'Scales, chord tones, and your own saved patterns.' },
+                        { number: '02', title: 'Tune your guitar', page: 'Tuner', text: 'Live pitch detection and open-string reference tones.' },
+                        { number: '03', title: 'Build a loop', page: 'Jam Mode', text: 'Set a tempo, record an idea, and play it back.' },
+                      ].map(tool => <button key={tool.page} onClick={() => setPage(tool.page)} className="tool-row">
+                        <span className="tool-number">{tool.number}</span><span><span className="tool-title">{tool.title}</span><span className="tool-copy block">{tool.text}</span></span><span className="tool-arrow" aria-hidden="true">↗</span>
+                      </button>)}
+                    </section>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-14">
-                    {[
-                      { glyph: '▦', title: 'Fretboard Explorer', page: 'FretBoard',
-                        text: 'Every scale, mode, and diatonic chord mapped across 21 frets. Toggle degrees, draw your own patterns, save them for later.' },
-                      { glyph: '◉', title: 'Chromatic Tuner', page: 'Tuner',
-                        text: 'Mic-based pitch detection with auto string detect and reference tones. Standard, Drop D, and half-step down presets.' },
-                      { glyph: '◎', title: 'Jam Mode', page: 'Jam Mode',
-                        text: 'Record over a click track with a one-bar count-in. Loops are quantized to the grid and saved right in your browser.' },
-                    ].map((card) => (
-                      <button
-                        key={card.title}
-                        onClick={() => setPage(card.page)}
-                        className="fl-panel relative p-6 pt-7 text-left cursor-pointer hover:brightness-110 transition"
-                      >
-                        <span className="screw" style={{ top: 10, left: 10 }} />
-                        <span className="screw" style={{ top: 10, right: 10 }} />
-                        <span className="screw" style={{ bottom: 10, left: 10 }} />
-                        <span className="screw" style={{ bottom: 10, right: 10 }} />
-                        <div className="text-[17px] font-extrabold text-[#f5e9d0] mb-2">
-                          <span className="text-[#fbbf24] mr-2">{card.glyph}</span>{card.title}
-                        </div>
-                        <p className="text-[#a89a86] text-[13.5px] leading-relaxed">{card.text}</p>
-                      </button>
-                    ))}
-                  </div>
+                  <div className="session-footer"><span>{savedDrawings.length} saved pattern{savedDrawings.length === 1 ? '' : 's'}</span><span>{savedLoops.length} saved loop{savedLoops.length === 1 ? '' : 's'}</span><span>Saved on this browser</span></div>
                 </div>
               )}
 
               {/* ---------------- Fretboard ---------------- */}
               {page === 'FretBoard' && (
-                <div className="px-6 py-6 max-w-[1400px] mx-auto">
+                <div className="page">
+                  <div className="page-heading"><div><h1>Fretboard explorer</h1><p className="page-description">Map a scale. Isolate a chord. Find your next phrase.</p></div><span className="fl-label">Standard tuning · 6 strings</span></div>
                   {/* Control deck */}
-                  <div className="fl-panel flex flex-wrap items-end gap-x-5 gap-y-4 px-5 py-4 mb-5">
+                  <div className="control-deck">
                     <div className="flex flex-col gap-1.5">
                       <label className="fl-label">Root note</label>
-                      <select value={rootNote} onChange={(e) => setRootNote(e.target.value)} className="fl-input h-9 px-3 text-sm">
+                      <select aria-label="Root note" value={rootNote} onChange={(e) => setRootNote(e.target.value)} className="fl-input h-9 px-3 text-sm">
                         {noteNames.map(note => <option key={note} value={note}>{note}</option>)}
                       </select>
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <label className="fl-label">Scale</label>
-                      <select value={scaleType} onChange={(e) => setScaleType(e.target.value)} className="fl-input h-9 px-3 text-sm">
+                      <select aria-label="Scale" value={scaleType} onChange={(e) => setScaleType(e.target.value)} className="fl-input h-9 px-3 text-sm">
                         {Object.entries(scaleNames).map(([key, name]) => <option key={key} value={key}>{name}</option>)}
                       </select>
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <label className="fl-label">Chords</label>
-                      <select value={chordType} onChange={(e) => setChordType(e.target.value)} className="fl-input h-9 px-3 text-sm">
+                      <select aria-label="Chord type" value={chordType} onChange={(e) => setChordType(e.target.value)} className="fl-input h-9 px-3 text-sm">
                         <option value="triads">Triads</option>
                         <option value="sevenths">Sevenths</option>
                       </select>
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <label className="fl-label">Root color</label>
-                      <input type="color" value={rootColor} onChange={(e) => setRootColor(e.target.value)}
-                        className="fl-input h-9 w-12 p-1 cursor-pointer" aria-label="Pick root note color" />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="fl-label">Note color</label>
-                      <input type="color" value={noteColor} onChange={(e) => setNoteColor(e.target.value)}
-                        className="fl-input h-9 w-12 p-1 cursor-pointer" aria-label="Pick scale note color" />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
                       <label className="fl-label">Display</label>
                       <div className="fl-switch h-9 items-center">
-                        <button className={`px-4 h-full text-[12.5px] ${!showDegrees ? 'on' : ''}`} onClick={() => setShowDegrees(false)}>Notes</button>
-                        <button className={`px-4 h-full text-[12.5px] ${showDegrees ? 'on' : ''}`} onClick={() => setShowDegrees(true)}>Degrees</button>
+                        <button className={`px-4 h-full text-[12.5px] ${!showDegrees ? 'on' : ''}`} aria-pressed={!showDegrees} onClick={() => setShowDegrees(false)}>Notes</button>
+                        <button className={`px-4 h-full text-[12.5px] ${showDegrees ? 'on' : ''}`} aria-pressed={showDegrees} onClick={() => setShowDegrees(true)}>Degrees</button>
                       </div>
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <label className="fl-label">Frets</label>
                       <div className="flex items-center gap-1.5">
                         <input
-                          type="number" min="1" max="21" value={startFret}
+                          aria-label="First fret" type="number" min="1" max="21" value={startFret}
                           onChange={(e) => {
                             const val = Math.max(1, Math.min(20, parseInt(e.target.value) || 1));
                             setStartFret(val);
@@ -2126,9 +2168,9 @@
                           }}
                           className="fl-input h-9 w-14 px-2 text-sm"
                         />
-                        <span className="text-[#6e6353]">–</span>
+                        <span className="text-[#929e92]">–</span>
                         <input
-                          type="number" min="1" max="21" value={endFret}
+                          aria-label="Last fret" type="number" min="1" max="21" value={endFret}
                           onChange={(e) => {
                             const val = Math.max(2, Math.min(21, parseInt(e.target.value) || 21));
                             setEndFret(val);
@@ -2142,16 +2184,16 @@
                       </div>
                     </div>
 
-                    <div className="w-px self-stretch bg-[#332b22] mx-1 hidden lg:block" />
+                    <div className="control-divider" />
 
-                    <div className="flex items-end gap-3">
+                    <div className="tempo-control">
                       <div className="flex flex-col items-center gap-1">
                         <Knob value={bpm} min={20} max={300} />
                         <label className="fl-label">Tempo</label>
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <input
-                          type="number" min="20" max="300" step="1" value={bpm} inputMode="numeric"
+                          aria-label="Tempo in BPM" type="number" min="20" max="300" step="1" value={bpm} inputMode="numeric"
                           onChange={(e) => setBpm(Math.max(20, Math.min(300, parseInt(e.target.value) || 0)))}
                           onBlur={(e) => setBpm(Math.max(20, Math.min(300, parseInt(e.target.value) || 100)))}
                           className="fl-input h-9 w-[70px] px-2 text-sm text-center font-semibold"
@@ -2164,20 +2206,21 @@
                       </div>
                     </div>
 
-                    <div className="ml-auto flex items-end gap-2">
+                    </div>
+                  <div className="drawing-toolbar"><span className="toolbar-hint">{drawingMode === 'draw' ? 'Select positions to mark your pattern' : drawingMode === 'erase' ? 'Select marks to erase them' : 'Mark a pattern on the neck'}</span>
                       <button
                         onClick={() => setDrawingMode(drawingMode === 'draw' ? null : 'draw')}
-                        className={`h-9 px-3.5 text-[13px] rounded-lg ${drawingMode === 'draw' ? 'fl-btn-primary' : 'fl-btn'}`}
-                        title="Draw on the fretboard"
+                        className={`h-9 px-3.5 text-[13px] rounded ${drawingMode === 'draw' ? 'fl-btn-primary' : 'fl-btn'}`}
+                        aria-pressed={drawingMode === 'draw'} title="Draw on the fretboard"
                       >
-                        ✏️ Draw
+                        Draw
                       </button>
                       <button
                         onClick={() => setDrawingMode(drawingMode === 'erase' ? null : 'erase')}
-                        className={`h-9 px-3.5 text-[13px] rounded-lg ${drawingMode === 'erase' ? 'fl-btn-danger' : 'fl-btn'}`}
-                        title="Erase marks"
+                        className={`h-9 px-3.5 text-[13px] rounded ${drawingMode === 'erase' ? 'fl-btn-danger' : 'fl-btn'}`}
+                        aria-pressed={drawingMode === 'erase'} title="Erase marks"
                       >
-                        🧹 Erase
+                        Erase
                       </button>
                       <button
                         onClick={handleSaveDrawing}
@@ -2185,23 +2228,37 @@
                         className="fl-btn-primary h-9 px-3.5 text-[13px]"
                         title="Save current diagram"
                       >
-                        💾 Save
+                        Save
                       </button>
                       <button onClick={() => setDrawings({})} className="fl-btn h-9 px-3.5 text-[13px]" title="Clear all marks">
-                        🔄 Clear
+                        Clear
                       </button>
-                    </div>
                   </div>
+                  <details className="display-options">
+                    <summary>Note appearance</summary>
+                    <div className="display-options-content">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="fl-label">Root color</label>
+                      <input type="color" value={rootColor} onChange={(e) => setRootColor(e.target.value)}
+                        className="fl-input h-9 w-12 p-1 cursor-pointer" aria-label="Pick root note color" />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="fl-label">Note color</label>
+                      <input type="color" value={noteColor} onChange={(e) => setNoteColor(e.target.value)}
+                        className="fl-input h-9 w-12 p-1 cursor-pointer" aria-label="Pick scale note color" />
+                    </div>
+                    </div>
+                  </details>
 
                   {/* Fretboard */}
-                  <div className="fl-panel p-5 overflow-x-auto">
-                    <div className="min-w-[900px]">
+                  <div className="fretboard-surface" tabIndex={0} role="region" aria-label="Guitar fretboard. Scroll horizontally to see all frets.">
+                    <div style={{ minWidth: Math.max(340, visibleFretCount * 46 + 48) }}>
                       <div className="flex mb-2.5 pl-12">
                         {[...Array(21)].map((_, fret) => {
                           const fretNum = fret + 1;
                           if (fretNum < startFret || fretNum > endFret) return null;
                           return (
-                            <div key={fret} className="text-center text-[11px] font-bold text-[#6e6353]"
+                            <div key={fret} className="text-center text-[11px] font-bold text-[#929e92]"
                               style={{ width: `${100 / visibleFretCount}%` }}>
                               {fretNum}
                             </div>
@@ -2209,10 +2266,10 @@
                         })}
                       </div>
 
-                      <div className="wood rounded-xl overflow-hidden">
+                      <div className="wood overflow-hidden">
                         {strings.map((string, stringIndex) => (
                           <div key={stringIndex} className="flex items-center h-[52px]">
-                            <div className="w-12 text-center font-extrabold text-[13px] text-[#f5e9d0]/85 select-none">
+                            <div className="w-12 text-center font-semibold text-[13px] text-[#eceee8]/85 select-none">
                               {string.name}
                             </div>
                             <div className="flex flex-1 relative h-full">
@@ -2234,9 +2291,12 @@
                                 const isDrawn = drawings[drawKey];
 
                                 return (
-                                  <div
+                                  <button type="button"
                                     key={fret}
-                                    className="h-full flex items-center justify-center relative"
+                                    aria-label={`String ${string.name}, fret ${fretNum}, ${noteNames[noteIndex]}${isDrawn ? ', marked' : ''}`}
+                                    aria-pressed={Boolean(isDrawn)}
+                                    tabIndex={drawingMode ? 0 : -1}
+                                    className="fret-position h-full flex items-center justify-center relative"
                                     style={{ width: `${100 / visibleFretCount}%` }}
                                     onMouseEnter={() => setHoveredNote(drawKey)}
                                     onMouseLeave={() => setHoveredNote(null)}
@@ -2250,10 +2310,10 @@
                                       }
                                     }}
                                   >
-                                    <div className="fret-wire absolute left-0 top-0 bottom-0 w-[3px]"></div>
+                                    <div className="fret-wire absolute left-0 top-0 bottom-0"></div>
 
                                     {isDrawn && (
-                                      <div className="absolute inset-1 border-[3px] border-[#fcd34d] rounded-lg pointer-events-none z-20 shadow-[0_0_10px_rgba(252,211,77,.4)]" />
+                                      <div className="absolute inset-1 border-[3px] border-[#fcd34d] rounded pointer-events-none z-20 " />
                                     )}
 
                                     {(() => {
@@ -2279,7 +2339,7 @@
 
                                       return (
                                         <div
-                                          className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-extrabold cursor-default transition-transform shadow-[0_2px_6px_rgba(0,0,0,.5)] ${glow ? 'note-root-glow' : ''} ${isHovered ? 'scale-110' : ''}`}
+                                          className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-semibold cursor-default transition-transform  ${glow ? 'note-root-glow' : ''} ${isHovered ? 'scale-110' : ''}`}
                                           style={{
                                             backgroundColor: bgColor,
                                             color: isLightColor(bgColor) ? '#2b1f10' : '#fff8ec'
@@ -2302,7 +2362,7 @@
                                       <div className="inlay-pearl absolute w-2.5 h-2.5 rounded-full"
                                         style={{ top: '70%', transform: 'translateY(-50%)' }}></div>
                                     )}
-                                  </div>
+                                  </button>
                                 );
                               })}
                             </div>
@@ -2312,11 +2372,17 @@
                     </div>
                   </div>
 
+                  <div className="fret-legend">
+                    <span className="legend-item"><span className="legend-dot" style={{ background: rootColor }} />Root</span>
+                    {selectedChord && <span className="legend-item"><span className="legend-dot" style={{ background: thirdColor }} />Third</span>}
+                    <span className="legend-item"><span className="legend-dot" style={{ background: noteColor }} />{selectedChord ? 'Chord tone' : 'Scale note'}</span>
+                    <span>Scroll across the neck to see all selected frets.</span>
+                  </div>
                   {/* Diatonic chords */}
                   <div className="mt-5">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-extrabold text-[#f5e9d0]">
-                        Chords in scale <span className="text-[#6e6353] font-semibold text-sm">({chordType})</span>
+                      <h3 className="font-semibold text-[#eceee8]">
+                        Chords in scale <span className="text-[#929e92] font-semibold text-sm">({chordType})</span>
                       </h3>
                       {selectedChord && (
                         <button onClick={() => setSelectedChord(null)} className="fl-btn h-8 px-3.5 text-[12.5px]">
@@ -2324,68 +2390,54 @@
                         </button>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-3">
+                    <div className="chord-grid">
                       {buildDiatonicChords.map((ch) => {
                         const isSel = selectedChord && selectedChord.name === ch.name;
                         return (
-                          <div
+                          <button type="button"
                             key={`${ch.degree}-${ch.name}`}
                             onClick={() => setSelectedChord(isSel ? null : ch)}
-                            className={`fl-card px-4 py-3 min-w-[126px] cursor-pointer transition ${
-                              isSel ? 'border-[#f59e0b] shadow-[0_0_0_1px_#f59e0b,0_0_16px_rgba(245,158,11,.25)]' : 'hover:border-[#5a4c39]'
-                            }`}
+                            aria-pressed={Boolean(isSel)}
+                            className="fl-card chord-option"
                           >
                             <div className="fl-label">{romanForChord(ch)}</div>
-                            <div className="font-extrabold text-base text-[#f5e9d0] mt-0.5 mb-2">{ch.name}</div>
+                            <div className="font-semibold text-base text-[#eceee8] mt-0.5 mb-2">{ch.name}</div>
                             <div className="flex gap-1">
                               {ch.pcs.map((pc, idx) => {
                                 const c = idx === 0 ? rootColor : (idx === 1 ? thirdColor : noteColor);
                                 return (
-                                  <div key={idx} className="w-[19px] h-[19px] rounded-full grid place-items-center text-[9px] font-extrabold"
+                                  <div key={idx} className="w-[19px] h-[19px] rounded-full grid place-items-center text-[9px] font-semibold"
                                     style={{ backgroundColor: c, color: isLightColor(c) ? '#2b1f10' : '#fff8ec' }}>
                                     {noteNames[pc]}
                                   </div>
                                 );
                               })}
                             </div>
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
                   </div>
 
                   {/* Saved fretboard notes */}
-                  <div className="fl-panel mt-6 p-4">
+                  <div className="saved-section">
                     <div className="flex items-center justify-between mb-3">
-                      <div className="font-extrabold text-[#f5e9d0]">Saved fretboard notes</div>
-                      <div className="text-xs text-[#6e6353]">Tap a saved set to load it.</div>
+                      <div className="font-semibold text-[#eceee8]">Saved fretboard notes</div>
+                      <div className="text-xs text-[#929e92]">Tap a saved set to load it.</div>
                     </div>
                     {savedDrawings.length === 0 ? (
-                      <div className="text-sm text-[#a89a86]">No saved notes yet. Draw on the board, then hit 💾 Save.</div>
+                      <div className="text-sm text-[#b1b9af]">No saved notes yet. Draw on the board, then hit Save.</div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {savedDrawings.map((preset) => {
                           const count = Object.keys(preset.data || {}).length;
                           return (
-                            <div
-                              key={preset.id}
-                              onClick={() => loadSavedDrawing(preset.id)}
-                              className="fl-card px-3.5 py-2.5 cursor-pointer hover:border-[#5a4c39] transition"
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="font-bold text-sm truncate text-[#f5e9d0]">{preset.name}</div>
-                                <button
-                                  type="button"
-                                  aria-label={`Delete ${preset.name}`}
-                                  onClick={(e) => { e.stopPropagation(); deleteSavedDrawing(preset.id); }}
-                                  className="text-[#6e6353] hover:text-[#f87356] px-1.5 rounded text-sm font-bold"
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                              <div className="text-xs mt-1 text-[#a89a86]">
-                                {count} note{count === 1 ? '' : 's'} • {preset.root || rootNote} {scaleNames[preset.scale] || scaleNames[scaleType]}
-                              </div>
+                            <div key={preset.id} className="saved-pattern">
+                              <button type="button" onClick={() => loadSavedDrawing(preset.id)}>
+                                <span className="block font-semibold text-sm truncate">{preset.name}</span>
+                                <span className="block text-xs mt-1 text-[#b1b9af]">{count} note{count === 1 ? '' : 's'} · {preset.root || rootNote} {scaleNames[preset.scale] || scaleNames[scaleType]}</span>
+                              </button>
+                              <button type="button" aria-label={`Delete ${preset.name}`} onClick={() => deleteSavedDrawing(preset.id)} className="fl-btn h-9 px-3">Delete</button>
                             </div>
                           );
                         })}
@@ -2397,13 +2449,13 @@
 
               {/* ---------------- Tuner ---------------- */}
               {page === 'Tuner' && (
-                <div className="max-w-5xl mx-auto px-8 py-10">
+                <div className="page">
                   <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-                    <div className="flex items-center gap-4">
-                      <div className="text-2xl font-extrabold text-[#f5e9d0]">Chromatic Tuner</div>
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div><h1>Chromatic tuner</h1><p className="page-description">Play one open string at a time.</p></div>
                       <div className="fl-switch h-8 items-center">
-                        <button className={`px-3.5 h-full text-xs ${autoDetectString ? 'on' : ''}`} onClick={() => setAutoDetectString(true)}>Auto detect</button>
-                        <button className={`px-3.5 h-full text-xs ${!autoDetectString ? 'on' : ''}`} onClick={() => setAutoDetectString(false)}>Manual</button>
+                        <button className={`px-3.5 h-full text-xs ${autoDetectString ? 'on' : ''}`} aria-pressed={autoDetectString} onClick={() => setAutoDetectString(true)}>Auto detect</button>
+                        <button className={`px-3.5 h-full text-xs ${!autoDetectString ? 'on' : ''}`} aria-pressed={!autoDetectString} onClick={() => setAutoDetectString(false)}>Manual</button>
                       </div>
                     </div>
                     {!isTunerOn ? (
@@ -2414,52 +2466,52 @@
                   </div>
 
                   {tunerError && (
-                    <div className="border border-[#9a3412] bg-[#2b1410] text-[#fca5a5] rounded-lg p-3 mb-4 text-sm">
+                    <div role="alert" className="border border-[#9a3412] bg-[#2b1410] text-[#fca5a5] rounded p-3 mb-4 text-sm">
                       Microphone error: {tunerError}
                     </div>
                   )}
 
-                  <div className="fl-panel p-6 grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div className="md:col-span-2 flex flex-col items-center justify-center">
-                      <div className="relative w-64 h-32">
+                  <div className="fl-panel tuner-workspace">
+                    <div className="flex flex-col items-center justify-center py-5">
+                      <div className="relative w-64 max-w-full h-32">
                         <div className="absolute inset-0 flex items-end justify-center">
-                          <div className="text-xs text-[#6e6353]">-50¢</div>
+                          <div className="text-xs text-[#929e92]">-50¢</div>
                           <div className="flex-1" />
-                          <div className="text-xs text-[#6e6353]">+50¢</div>
+                          <div className="text-xs text-[#929e92]">+50¢</div>
                         </div>
                         <div className="absolute left-1/2 bottom-0 -translate-x-1/2 w-8 h-24 bg-green-500/20 rounded" />
                         <div
-                          className="absolute left-1/2 bottom-0 -translate-x-1/2 w-1 h-24 bg-[#fbbf24] origin-bottom rounded shadow-[0_0_8px_rgba(251,191,36,.7)]"
+                          className="absolute left-1/2 bottom-0 -translate-x-1/2 w-1 h-24 bg-[#e0c48e] origin-bottom rounded "
                           style={{ transform: `translateX(-50%) rotate(${(tunerCents / 50) * 45}deg)` }}
                         />
-                        <div className="absolute left-0 right-0 bottom-0 h-1.5 bg-[#332b22] rounded" />
+                        <div className="absolute left-0 right-0 bottom-0 h-1.5 bg-[#343a35] rounded" />
                       </div>
                       <div className="mt-6 text-center">
                         <div className="fl-label">Detected</div>
-                        <div className="text-[#f5e9d0] text-5xl font-black leading-tight">{tunerNote}</div>
-                        <div className="text-sm mt-1 text-[#a89a86]">{tunerFreq ? tunerFreq.toFixed(1) + ' Hz' : '--'}</div>
-                        <div className={`mt-2 text-sm font-bold ${Math.abs(tunerCents) <= 5 ? 'text-green-400' : 'text-[#fbbf24]'}`}>
-                          {Math.abs(tunerCents) <= 5 ? 'In tune' : tunerCents < 0 ? `${Math.abs(tunerCents)}¢ flat` : `${tunerCents}¢ sharp`}
+                        <div className="text-[#eceee8] text-5xl font-semibold leading-tight">{tunerNote}</div>
+                        <div className="text-sm mt-1 text-[#b1b9af]">{tunerFreq ? tunerFreq.toFixed(1) + ' Hz' : '--'}</div>
+                        <div className={`mt-2 text-sm font-bold ${!isTunerOn || !tunerFreq ? 'text-[#b1b9af]' : Math.abs(tunerCents) <= 5 ? 'text-green-400' : 'text-[#e0c48e]'}`}>
+                          {!isTunerOn ? 'Start tuning to enable your microphone' : !tunerFreq ? 'Listening — play an open string' : Math.abs(tunerCents) <= 5 ? 'In tune' : tunerCents < 0 ? `${Math.abs(tunerCents)}¢ flat` : `${tunerCents}¢ sharp`}
                         </div>
                         <div className="mt-4 flex flex-col items-center gap-1.5">
-                          <div className="text-sm font-bold text-[#f5e9d0]">
-                            Target: <span className="text-[#fbbf24]">{tuningPresets[tuning][selectedString]}</span>
+                          <div className="text-sm font-bold text-[#eceee8]">
+                            Target: <span className="text-[#e0c48e]">{tuningPresets[tuning][selectedString]}</span>
                           </div>
-                          <div className="w-40 h-2 rounded-full overflow-hidden bg-[#141110] border border-[#332b22]">
+                          <div className="w-40 h-2 rounded-full overflow-hidden bg-[#191c19] border border-[#343a35]">
                             {(() => {
                               const start = stringHoldStart;
                               const progress = stringConfirmed ? 1 : (start ? Math.min(1, (performance.now() - start) / 3000) : 0);
-                              const barColor = stringConfirmed ? 'bg-green-500' : 'bg-[#f59e0b]';
+                              const barColor = stringConfirmed ? 'bg-green-500' : 'bg-[#d6b577]';
                               return <div className={`${barColor} h-full transition-[width]`} style={{ width: `${progress * 100}%` }} />;
                             })()}
                           </div>
                         </div>
                       </div>
                     </div>
-                    <div className="space-y-3">
+                    <div className="tuner-settings space-y-3">
                       <div className="fl-label">Tuning</div>
                       <select
-                        value={tuning}
+                        aria-label="Tuning" value={tuning}
                         onChange={(e) => setTuning(e.target.value)}
                         className="fl-input w-full h-9 px-3 text-sm"
                       >
@@ -2468,56 +2520,17 @@
                         <option value="halfStepDown">Half-step Down (D# G# C# F# A# D#)</option>
                       </select>
 
-                      <div className="wood rounded-xl p-3 border border-[#453a2d]">
-                        <div className="fl-label mb-2">Headstock</div>
-                        <div className="relative w-72 h-44 mx-auto max-w-full">
-                          <div className="absolute left-1/2 -translate-x-1/2 top-2 bottom-2 w-20 rounded-[24px] bg-[#241708] shadow-inner" />
-                          <div className="absolute left-1/2 -translate-x-1/2 bottom-2 h-1 w-24 rounded bg-[#e8dcc0]" />
-
-                          {(() => {
-                            const positions = [
-                              { idx: 0, side: 'left', top: '76%' },
-                              { idx: 1, side: 'left', top: '50%' },
-                              { idx: 2, side: 'left', top: '24%' },
-                              { idx: 3, side: 'right', top: '24%' },
-                              { idx: 4, side: 'right', top: '50%' },
-                              { idx: 5, side: 'right', top: '76%' },
-                            ];
-
-                            return positions.map((p) => {
-                              const open = tuningPresets[tuning][p.idx];
-                              const isSelected = p.idx === selectedString;
-                              const pillClass = isSelected
-                                ? (stringConfirmed
-                                    ? 'bg-green-600 text-white border-green-600'
-                                    : 'bg-[#f59e0b] text-[#2b1a05] border-[#b45309] shadow-[0_0_10px_rgba(245,158,11,.5)]')
-                                : 'bg-[#141110] text-[#efe7da] border-[#453a2d]';
-                              const pegSideClass = p.side === 'left' ? 'left-3' : 'right-3';
-                              const labelSideClass = p.side === 'left' ? 'left-12' : 'right-12';
-                              const stringAnchorClass = p.side === 'left' ? 'left-[88px]' : 'right-[88px]';
-                              return (
-                                <div key={p.idx} className="absolute" style={{ top: p.top, left: 0, right: 0 }}>
-                                  <div className={`string-metal absolute ${stringAnchorClass} h-0.5 w-16`} />
-                                  <div className={`absolute ${pegSideClass} -translate-y-1/2`}>
-                                    <div className="w-4 h-4 rounded-full shadow bg-gradient-to-br from-[#e8dcc0] to-[#8f8468]" />
-                                  </div>
-                                  <button
-                                    type="button"
-                                    className={`absolute ${labelSideClass} -translate-y-1/2 px-2.5 py-0.5 text-xs font-bold rounded-full border ${pillClass}`}
-                                    onClick={() => {
-                                      setSelectedString(p.idx);
-                                      playStringSound(p.idx);
-                                    }}
-                                  >
-                                    {open}
-                                  </button>
-                                </div>
-                              );
-                            });
-                          })()}
-                        </div>
+                      <div className="fl-label mt-5">Reference strings · low to high</div>
+                      <div className="string-grid">
+                        {tuningPresets[tuning].map((open, idx) => (
+                          <button type="button" key={idx} className="string-key" aria-pressed={idx === selectedString}
+                            aria-label={`String ${6 - idx}, ${open}, play reference tone`}
+                            onClick={() => { setSelectedString(idx); playStringSound(idx); }}>
+                            <small>STRING {6 - idx}</small><strong>{open}</strong>
+                          </button>
+                        ))}
                       </div>
-                      <div className="text-xs text-[#6e6353] leading-relaxed">
+                      <div className="text-xs text-[#929e92] leading-relaxed">
                         Tap a string to hear its reference tone. Hold a string in tune for 3 seconds to lock it in.
                       </div>
                     </div>
@@ -2527,22 +2540,22 @@
 
               {/* ---------------- Jam Mode ---------------- */}
               {page === 'Jam Mode' && (
-                <div className="max-w-5xl mx-auto px-8 py-10">
-                  <div className="text-2xl font-extrabold text-[#f5e9d0] mb-6">Jam Mode</div>
+                <div className="page">
+                  <div className="page-heading"><div><h1>Jam Mode</h1><p className="page-description">Record a phrase, shape the loop, and keep playing.</p></div><span className="fl-label">4/4 time</span></div>
 
                   {isCountdownActive && countdown !== null && (
                     <div className="fixed inset-0 z-40 pointer-events-none flex items-center justify-center">
-                      <div className="text-[8rem] md:text-[10rem] font-black text-[#fbbf24] [text-shadow:0_0_60px_rgba(245,158,11,.6)]">
+                      <div role="status" className="text-[8rem] md:text-[10rem] font-semibold text-[#e0c48e] bg-[#171918]/95 px-10 rounded-md">
                         {countdown}
                       </div>
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="fl-panel p-5">
+                  <div className="jam-settings">
+                    <section>
                       <div className="fl-label mb-2">Key</div>
                       <select
-                        value={selectedKey}
+                        aria-label="Key" value={selectedKey}
                         onChange={(e) => setSelectedKey(e.target.value)}
                         className="fl-input w-full h-10 px-3 text-sm"
                         disabled={isRecording || isCountdownActive}
@@ -2551,7 +2564,7 @@
                       </select>
                       <div className="fl-label mt-5 mb-2">Chord progression</div>
                       <select
-                        value={selectedProgression ?? ''}
+                        aria-label="Chord progression" value={selectedProgression ?? ''}
                         onChange={(e) => setSelectedProgression(e.target.value === '' ? null : parseInt(e.target.value))}
                         className="fl-input w-full h-10 px-3 text-sm"
                       >
@@ -2561,20 +2574,20 @@
                       {selectedProgression !== null && chordProgressions[selectedProgression].romans.length > 0 && (
                         <div className="mt-3.5 flex flex-wrap gap-2">
                           {chordsForProgression(selectedKey, chordProgressions[selectedProgression].romans).map((chord, idx) => (
-                            <div key={idx} className="fl-card px-3.5 py-1.5 font-bold text-[#f5e9d0] text-sm">
+                            <div key={idx} className="fl-card px-3.5 py-1.5 font-bold text-[#eceee8] text-sm">
                               {chord}
                             </div>
                           ))}
                         </div>
                       )}
-                    </div>
+                    </section>
 
-                    <div className="fl-panel p-5">
+                    <section>
                       <div className="fl-label mb-3">Click track</div>
-                      <div className="flex items-center gap-4 mb-4">
+                      <div className="flex flex-wrap items-center gap-4 mb-4">
                         <Knob value={bpm} min={20} max={300} />
                         <input
-                          type="number" min={20} max={300} value={bpm}
+                          aria-label="Tempo in BPM" type="number" min={20} max={300} value={bpm}
                           onChange={(e) => {
                             const v = Math.max(20, Math.min(300, Number(e.target.value) || 0));
                             setBpm(v);
@@ -2582,96 +2595,100 @@
                           className="fl-input h-10 w-24 px-3 text-sm text-center font-semibold"
                         />
                         <div className="fl-switch h-9 items-center">
-                          <button className={`px-4 h-full text-xs ${isMetronomeEnabled ? 'on' : ''}`} onClick={() => setIsMetronomeEnabled(true)}>On</button>
-                          <button className={`px-4 h-full text-xs ${!isMetronomeEnabled ? 'on' : ''}`} onClick={() => setIsMetronomeEnabled(false)}>Off</button>
+                          <button className={`px-4 h-full text-xs ${isMetronomeEnabled ? 'on' : ''}`} aria-pressed={isMetronomeEnabled} onClick={() => setIsMetronomeEnabled(true)}>On</button>
+                          <button className={`px-4 h-full text-xs ${!isMetronomeEnabled ? 'on' : ''}`} aria-pressed={!isMetronomeEnabled} onClick={() => setIsMetronomeEnabled(false)}>Off</button>
                         </div>
                       </div>
-                      <div className="text-sm text-[#a89a86]">1 bar count-in at {bpm} BPM{isMetronomeEnabled ? ', click while recording' : ''}.</div>
-                    </div>
+                      <div className="text-sm text-[#b1b9af]">1 bar count-in at {bpm} BPM{isMetronomeEnabled ? ', click while recording' : ''}.</div>
+                    </section>
                   </div>
 
                   <div className="mt-4 w-full max-w-2xl mx-auto text-center h-5">
                     {isLoopProcessing && (
-                      <div className="text-sm font-bold text-[#fbbf24]">Quantizing…</div>
+                      <div className="text-sm font-bold text-[#e0c48e]">Quantizing…</div>
                     )}
                     {!isLoopProcessing && loopQuantizeInfo && (
-                      <div className="text-sm text-[#a89a86]">
+                      <div className="text-sm text-[#b1b9af]">
                         {loopQuantizeInfo.beats} beat{loopQuantizeInfo.beats === 1 ? '' : 's'} @ {loopQuantizeInfo.bpm} BPM
                       </div>
                     )}
                   </div>
 
-                  <div className="mt-6 flex flex-col items-center">
+                  <div className="transport">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4"><div className="fl-label">Transport</div><span className="text-xs text-[#b1b9af]" role="status">{isRecording ? 'Recording in progress' : isCountdownActive ? 'Get ready…' : recordedAudio ? `${audioDuration.toFixed(2)}s recorded` : 'Ready to record'}</span></div>
+                    <div className="transport-controls">
                     <button
                       onClick={() => (isRecording || isCountdownActive) ? stopRecording() : startRecording()}
-                      className={`h-12 px-8 rounded-[10px] text-[15px] ${(isRecording || isCountdownActive) ? 'fl-btn-danger' : 'fl-btn-primary'}`}
+                      className={`h-12 px-8 rounded text-[15px] ${(isRecording || isCountdownActive) ? 'fl-btn-danger' : 'fl-btn-primary'}`}
                       disabled={isCropping || isLoopProcessing}
                     >
                       {isCountdownActive ? '⏹ Cancel countdown' : isRecording ? '⏹ Stop recording' : '● Start recording'}
                     </button>
 
-                    <div className="mt-4 flex flex-wrap justify-center items-center gap-2.5">
+                    <div className="transport-secondary">
                       <button
                         onClick={() => isPlaying ? stopPlayback() : playRecordedAudio()}
                         disabled={!recordedAudio}
-                        className={`h-10 px-5 rounded-lg ${isPlaying ? 'fl-btn-danger' : 'fl-btn'}`}
+                        className={`h-10 px-5 rounded ${isPlaying ? 'fl-btn-danger' : 'fl-btn'}`}
                       >
                         {isPlaying ? '⏸ Stop' : '▶ Play'}
                       </button>
                       <button
-                        onClick={() => { const nl = !isLooping; setIsLooping(nl); jamModeRef.current.shouldLoop = nl; }}
+                        aria-pressed={isLooping} onClick={() => { const nl = !isLooping; setIsLooping(nl); jamModeRef.current.shouldLoop = nl; }}
                         disabled={!recordedAudio}
-                        className={`h-10 px-5 rounded-lg ${isLooping ? 'fl-btn-primary' : 'fl-btn'}`}
+                        className={`h-10 px-5 rounded ${isLooping ? 'fl-btn-primary' : 'fl-btn'}`}
                       >
-                        {isLooping ? '🔁 Looping' : '🔁 Loop'}
+                        {isLooping ? 'Looping' : 'Loop'}
                       </button>
                       <button
-                        onClick={() => setShowCropUI(!showCropUI)}
+                        aria-expanded={showCropUI} onClick={() => setShowCropUI(!showCropUI)}
                         disabled={!recordedAudio}
-                        className={`h-10 px-5 rounded-lg ${showCropUI ? 'fl-btn-primary' : 'fl-btn'}`}
+                        className={`h-10 px-5 rounded ${showCropUI ? 'fl-btn-primary' : 'fl-btn'}`}
                       >
-                        ✂ Edit
+                        Edit
                       </button>
                       <button
                         onClick={() => saveLoopToDb()}
                         disabled={!recordedAudio}
-                        className="fl-btn h-10 px-5 rounded-lg"
+                        className="fl-btn h-10 px-5 rounded"
                       >
-                        💾 Save loop
+                        Save loop
                       </button>
                     </div>
                   </div>
 
+                  {!recordedAudio && <p className="empty-state">Your loop will appear here. Recording starts after a one-bar count-in.</p>}
+                  </div>
                   {showCropUI && recordedAudio && (
-                    <div className="fl-panel p-5 mt-6 max-w-3xl mx-auto w-full">
-                      <div className="font-extrabold text-[#f5e9d0] mb-1">Trim loop</div>
-                      <div className="text-xs mb-3 text-[#6e6353]">Drag the handles to trim, drag the middle to move the selection.</div>
+                    <div className="fl-panel p-5 mt-6 w-full">
+                      <div className="font-semibold text-[#eceee8] mb-1">Trim loop</div>
+                      <div className="text-xs mb-3 text-[#929e92]">Drag the handles to trim, drag the middle to move the selection.</div>
 
-                      <div className="rounded-lg p-3 bg-[#141110] border border-[#332b22]">
+                      <div className="rounded p-3 bg-[#191c19] border border-[#343a35]">
                         <canvas id="waveform-canvas" width="800" height="140" className="w-full h-[140px] rounded bg-transparent cursor-pointer select-none touch-none" />
                       </div>
 
-                      <div className="flex items-center gap-3 mt-4">
+                      <div className="flex flex-wrap items-center gap-3 mt-4">
                         <button onClick={cropAudio} disabled={isCropping || isRecording} className="fl-btn-primary h-10 px-5 text-sm">
-                          {isCropping ? 'Trimming…' : '✂ Apply trim'}
+                          {isCropping ? 'Trimming…' : 'Apply trim'}
                         </button>
                         <button onClick={undoTrim} disabled={undoStack.length === 0 || isCropping || isRecording} className="fl-btn h-10 px-5 text-sm">
                           ↺ Undo
                         </button>
-                        <div className="text-sm text-[#a89a86] ml-auto">Duration: {audioDuration.toFixed(2)}s</div>
+                        <div className="text-sm text-[#b1b9af] ml-auto">Duration: {audioDuration.toFixed(2)}s</div>
                       </div>
                     </div>
                   )}
 
                   {savedLoops && savedLoops.length > 0 && (
                     <div className="mt-8">
-                      <div className="font-extrabold text-[#f5e9d0] mb-3">Saved loops</div>
+                      <div className="font-semibold text-[#eceee8] mb-3">Saved loops</div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {savedLoops.map(loop => (
-                          <div key={loop.id} className="fl-card p-3.5 flex items-center justify-between gap-3">
+                          <div key={loop.id} className="fl-card p-3.5 flex flex-wrap items-center justify-between gap-3">
                             <div className="min-w-0">
-                              <div className="font-bold text-sm text-[#f5e9d0] truncate">{loop.name || 'Untitled loop'}</div>
-                              <div className="text-xs text-[#a89a86] mt-0.5">
+                              <div className="font-bold text-sm text-[#eceee8] truncate">{loop.name || 'Untitled loop'}</div>
+                              <div className="text-xs text-[#b1b9af] mt-0.5">
                                 {loop.progressionName ? `${loop.progressionName} • ` : ''}Key {loop.key} • {loop.bpm} BPM
                               </div>
                             </div>
@@ -2689,22 +2706,19 @@
 
               {/* ---------------- About ---------------- */}
               {page === 'About' && (
-                <div className="max-w-3xl mx-auto px-8 py-10">
-                  <div className="text-2xl font-extrabold text-[#f5e9d0] mb-5">About</div>
-                  <div className="fl-panel p-6 space-y-4 text-[#a89a86] leading-relaxed relative">
-                    <span className="screw" style={{ top: 10, left: 10 }} />
-                    <span className="screw" style={{ top: 10, right: 10 }} />
-                    <span className="screw" style={{ bottom: 10, left: 10 }} />
-                    <span className="screw" style={{ bottom: 10, right: 10 }} />
+                <div className="page">
+                  <div className="page-heading"><div><div className="eyebrow">FretLab</div><h1>A workspace for your practice.</h1></div></div>
+                  <div className="about-copy space-y-4">
                     <p>
                       FretLab is a free, browser-based practice studio for guitarists. Visualize any scale or
                       diatonic chord across the full neck, tune up with the chromatic tuner, and record
                       quantized practice loops in Jam Mode — no installs, no accounts.
                     </p>
-                    <p className="text-[#f5e9d0] font-semibold">Built by Nathan Kwon.</p>
+                    <p className="text-[#eceee8] font-semibold">Built by Nathan Kwon.</p>
                   </div>
                 </div>
               )}
+              </main>
             </div>
           </div>
         );
@@ -2728,12 +2742,12 @@
         render() {
           if (this.state.hasError) {
             return (
-              <div className="min-h-screen flex items-center justify-center bg-red-50 p-6">
-                <div className="max-w-lg w-full bg-white shadow rounded-lg p-6 border border-red-200">
-                  <h2 className="text-lg font-semibold text-red-700 mb-2">Something went wrong</h2>
-                  <p className="text-sm text-red-600">{String(this.state.error)}</p>
+              <div className="min-h-screen flex items-center justify-center p-6">
+                <div className="fl-panel max-w-lg w-full p-6">
+                  <h2 className="text-lg font-semibold text-[#ffb6a8] mb-2">Something went wrong</h2>
+                  <p className="text-sm text-[#ffb6a8]">{String(this.state.error)}</p>
                   <button
-                    className="mt-4 px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700"
+                    className="fl-btn-primary mt-4 px-4 py-2"
                     onClick={() => window.location.reload()}
                   >
                     Reload
@@ -2766,10 +2780,10 @@
           const container = document.getElementById('root');
           if (container) {
             container.innerHTML = `
-              <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#fff1f2;padding:24px;">
-                <div style="max-width:640px;width:100%;background:#ffffff;border:1px solid #fecaca;border-radius:12px;padding:16px;font-family:ui-sans-serif,system-ui;">
-                  <div style="font-weight:600;color:#b91c1c;margin-bottom:8px;">Failed to load the app</div>
-                  <div style="color:#991b1b;font-size:14px;">${String(e)}</div>
+              <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#171918;padding:24px;">
+                <div style="max-width:640px;width:100%;background:#202321;border:1px solid #454d46;border-radius:6px;padding:16px;font-family:ui-sans-serif,system-ui;">
+                  <div style="font-weight:600;color:#ffb6a8;margin-bottom:8px;">Failed to load the app</div>
+                  <div style="color:#b1b9af;font-size:14px;">${String(e)}</div>
                 </div>
               </div>`;
           }
