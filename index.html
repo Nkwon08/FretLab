@@ -166,6 +166,33 @@
         .transport-secondary { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
       }
       @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+
+      .fretboard-focus-toolbar {
+        display: flex; align-items: center;
+        justify-content: space-between; flex-wrap: wrap; gap: 12px;
+      }
+      .fretboard-focus.is-expanded {
+        position: fixed; inset: 0; z-index: 100;
+        width: 100%; height: 100%; height: 100dvh;
+        margin: 0; background: var(--bg); overflow: auto;
+        padding: max(16px, env(safe-area-inset-top))
+                 max(20px, env(safe-area-inset-right))
+                 max(16px, env(safe-area-inset-bottom))
+                 max(20px, env(safe-area-inset-left));
+        display: flex; flex-direction: column;
+      }
+      .fretboard-focus:fullscreen { background: var(--bg); }
+      .fretboard-focus.is-expanded .fretboard-focus-toolbar {
+        flex: none; padding-bottom: 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      .fretboard-focus.is-expanded .fretboard-surface {
+        flex: 1; min-height: 0; padding-block: 24px;
+        align-content: center;
+      }
+      .fretboard-focus.is-expanded .wood > div {
+        height: clamp(44px, 9vh, 84px);
+      }
     </style>
   </head>
   <body class="antialiased">
@@ -271,6 +298,122 @@
         if (q === 'dim' || q === 'dim7') roman += '°';
         if (q === 'm7b5') roman += 'ø';
         return roman;
+      };
+
+
+      const FretboardFocus = ({ children, title }) => {
+        const [expanded, setExpanded] = React.useState(false);
+        const panelRef = React.useRef(null);
+        const buttonRef = React.useRef(null);
+        const wantsExpanded = React.useRef(false);
+        const nativeActive = React.useRef(false);
+
+        const close = async () => {
+          wantsExpanded.current = false;
+          if (document.fullscreenElement === panelRef.current) {
+            try { await document.exitFullscreen(); }
+            catch { wantsExpanded.current = true; return; }
+          }
+          setExpanded(false);
+        };
+
+        const open = () => {
+          wantsExpanded.current = true;
+          setExpanded(true);
+          const panel = panelRef.current;
+          if (panel.requestFullscreen) {
+            try {
+              Promise.resolve(panel.requestFullscreen()).then(() => {
+                if (!wantsExpanded.current &&
+                    document.fullscreenElement === panel) {
+                  document.exitFullscreen().catch(() => setExpanded(true));
+                }
+              }).catch(() => {});
+            } catch {}
+          }
+        };
+
+        React.useEffect(() => {
+          const sync = () => {
+            if (document.fullscreenElement === panelRef.current) {
+              nativeActive.current = true;
+            } else if (nativeActive.current) {
+              nativeActive.current = false;
+              wantsExpanded.current = false;
+              setExpanded(false);
+            }
+          };
+          document.addEventListener('fullscreenchange', sync);
+          return () => document.removeEventListener('fullscreenchange', sync);
+        }, []);
+
+        React.useEffect(() => {
+          if (!expanded) return;
+          const panel = panelRef.current;
+          const oldOverflow = document.body.style.overflow;
+          const background = [];
+
+          for (let node = panel; node && node !== document.body;
+               node = node.parentElement) {
+            for (const sibling of node.parentElement.children) {
+              if (sibling !== node && sibling instanceof HTMLElement) {
+                background.push([sibling, sibling.inert]);
+                sibling.inert = true;
+              }
+            }
+          }
+
+          document.body.style.overflow = 'hidden';
+          buttonRef.current.focus();
+
+          const onKeyDown = (event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              close();
+            } else if (event.key === 'Tab') {
+              const items = [...panel.querySelectorAll(
+                'button:not([disabled]):not([tabindex="-1"]), [tabindex="0"]'
+              )];
+              const first = items[0], last = items[items.length - 1];
+              if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+              } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+              }
+            }
+          };
+
+          document.addEventListener('keydown', onKeyDown);
+          return () => {
+            document.removeEventListener('keydown', onKeyDown);
+            background.forEach(([node, wasInert]) => {
+              node.inert = wasInert;
+            });
+            document.body.style.overflow = oldOverflow;
+            buttonRef.current?.focus();
+          };
+        }, [expanded]);
+
+        return (
+          <section ref={panelRef}
+            className={`fretboard-focus ${expanded ? 'is-expanded' : ''}`}
+            role={expanded ? 'dialog' : 'region'}
+            aria-modal={expanded ? true : undefined}
+            aria-label={`${title} fretboard`}>
+            <div className="fretboard-focus-toolbar">
+              <span className="fl-label">{title}</span>
+              <button ref={buttonRef} type="button"
+                className="fl-btn h-9 px-3 text-xs"
+                aria-expanded={expanded}
+                onClick={expanded ? close : open}>
+                {expanded ? 'Close full screen' : 'Expand fretboard'}
+              </button>
+            </div>
+            {children}
+          </section>
+        );
       };
 
       const GuitarScaleExplorer = () => {
@@ -2251,6 +2394,7 @@
                   </details>
 
                   {/* Fretboard */}
+                  <FretboardFocus title={`${rootNote} ${scaleNames[scaleType]}`}>
                   <div className="fretboard-surface" tabIndex={0} role="region" aria-label="Guitar fretboard. Scroll horizontally to see all frets.">
                     <div style={{ minWidth: Math.max(340, visibleFretCount * 46 + 48) }}>
                       <div className="flex mb-2.5 pl-12">
@@ -2372,6 +2516,7 @@
                     </div>
                   </div>
 
+                  </FretboardFocus>
                   <div className="fret-legend">
                     <span className="legend-item"><span className="legend-dot" style={{ background: rootColor }} />Root</span>
                     {selectedChord && <span className="legend-item"><span className="legend-dot" style={{ background: thirdColor }} />Third</span>}
