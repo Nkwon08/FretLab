@@ -1,0 +1,61 @@
+.daw[hidden] { display:none; }
+.daw button { padding:8px 13px; white-space:nowrap; }
+.daw h1 { font-size:clamp(24px,3vw,36px); }
+.daw label { display:flex; flex-direction:column; gap:5px; font-size:11px; color:var(--muted); }
+.daw input:not([type=range]):not([type=file]),.daw select { background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);padding:8px;min-width:0; }
+.daw input[type=range] { accent-color:var(--amber);min-width:0; }
+.daw-settings { display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:20px;padding:22px;margin-bottom:20px; }
+.daw-settings h2 { font-size:16px;font-weight:600; }
+.daw-settings p,.daw-note { color:var(--faint);font-size:12px;line-height:1.8; }
+.daw-settings button { margin-top:12px; }
+.daw-note { margin-top:16px;grid-column:1/-1;max-width:900px; }
+.daw-transport { display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:18px;margin-bottom:16px; }
+.daw-transport label { width:65px; }.daw-time { font:24px ui-monospace,monospace;color:var(--amber2);margin:0 12px; }
+.daw-status { margin-left:auto;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);font-size:10px; }.daw-status.recording { color:#ffb6a8; }
+.daw-tools { display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:14px 0; }.daw-tools button { font-size:12px; }.daw-tools label { margin-left:8px; }
+.daw-scroll { overflow:auto;border:1px solid var(--border2);border-radius:6px;max-height:65vh;background:#1b1f1c; }
+.daw-arrangement { position:relative;min-height:310px;padding-bottom:70px; }
+.daw-ruler,.daw-track { display:flex;border-bottom:1px solid var(--border); }
+.daw-track-label { position:sticky;left:0;width:200px;flex-shrink:0;background:#232823;z-index:4;padding:14px;border-right:1px solid var(--border2); }
+.daw-ruler .daw-track-label { font-size:10px;letter-spacing:.08em;height:54px; }.daw-ruler small { margin-left:12px;color:var(--faint); }
+.daw-track-label>input { width:100%;font-weight:600;border-color:transparent!important;padding:0!important;background:transparent!important; }
+.daw-track.armed .daw-track-label { box-shadow:inset 3px 0 var(--amber); }
+.daw-track-actions { display:flex;gap:6px;margin:10px 0; }.daw-track-actions button { font-size:10px;padding:3px 9px;min-height:27px; }
+.daw-volume { flex-direction:row!important;align-items:center; }.daw-volume input { width:110px; }
+.daw-ruler-line { position:relative;height:54px;cursor:crosshair; }.daw-ruler-line>span { position:absolute;top:8px;font:10px ui-monospace,monospace;color:var(--faint);padding-left:5px;border-left:1px solid var(--border2); }
+.daw-loop-region { position:absolute;bottom:0;height:3px;background:var(--amber);pointer-events:none; }
+.daw-lane { position:relative;height:var(--track-height,133px);flex-shrink:0;background-image:linear-gradient(to right,#343b3466 1px,transparent 1px);cursor:crosshair; }
+.daw-empty { display:block;padding:calc(var(--track-height,133px) / 2 - 12px) 24px;font-size:12px;color:#768374;pointer-events:none; }
+.daw-clip { position:absolute;top:14px;height:calc(var(--track-height,133px) - 28px);background:#344b39;border:1px solid #627d5d;border-radius:5px;overflow:hidden;cursor:grab;touch-action:none;user-select:none; }
+.daw-clip.selected { border:2px solid var(--amber2);background:#405640; }.daw-clip-title { display:block;padding:7px 12px;font-size:11px;white-space:nowrap;color:#e4eddf; }.daw-clip canvas { width:100%;height:calc(100% - 32px);pointer-events:none; }
+.daw-handle { position:absolute;top:0;bottom:0;width:9px;cursor:ew-resize;background:#d6b57733;touch-action:none; }.daw-handle.left { left:0; }.daw-handle.right { right:0; }
+.daw-playhead { position:absolute;top:0;bottom:0;width:1px;background:var(--amber2);pointer-events:none;z-index:3; }.daw-playhead:before { content:'';position:absolute;top:0;left:-5px;border:5px solid transparent;border-top:8px solid var(--amber2); }
+.daw-record-region { position:absolute;top:14px;height:calc(var(--track-height,133px) - 28px);border:1px solid #b77b70;background:#713e3e99;color:#ffc3b7;font-size:11px;padding:8px;overflow:hidden; }
+.daw-inspector { display:flex;align-items:center;flex-wrap:wrap;gap:20px;padding:16px;margin-top:16px; }.daw-inspector>div { min-width:180px; }.daw-inspector input { width:100px; }.daw-message { font-size:13px;color:var(--amber2);margin:16px 0;min-height:20px; }
+.daw-import { position:relative;overflow:hidden;padding:8px 13px;cursor:pointer;font-size:12px!important; }.daw-import input { position:absolute;inset:0;opacity:0;width:100%;cursor:pointer; }.daw-legacy { margin:16px 0; }.daw-legacy button { margin:8px; }
+@media(max-width:700px) { .daw-settings { grid-template-columns:1fr; }.daw .page-heading { flex-wrap:wrap;gap:15px; }.daw-transport { padding:12px; }.daw-time { font-size:20px; }.daw-inspector { gap:12px; } }
+
+.daw-view-tools { display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding:12px 0 18px; }
+.daw-zoom-group { display:flex;align-items:center;gap:8px; }
+.daw-zoom-group>span { font-size:12px;color:var(--muted); }
+.daw-zoom-group button { min-height:30px;padding:3px 10px;font-size:12px; }
+.daw-zoom-group input { width:110px; }
+.daw-view-hint { font-size:11px;color:var(--faint); }
+.daw-ruler-line>span strong { display:block;font-weight:500;color:var(--text); }
+.daw-ruler-line>span small { display:block;font-size:9px;margin-top:6px;color:var(--faint); }
+.daw-ruler .daw-track-label { display:flex;flex-direction:column;gap:2px;padding:8px 14px; }
+.daw-ruler .daw-track-label small { margin-left:0;font-size:9px; }
+.daw-track>.daw-track-label { height:var(--track-height,133px);padding-top:10px;padding-bottom:10px; }
+.daw-track-actions { margin:7px 0; }
+@media(max-width:420px) { .daw-zoom-group { gap:5px; }.daw-zoom-group input { width:80px; } }
+/* The native scroll extent is separate from the viewport-sized drawing surface. */
+.daw-window { position:sticky;left:0;overflow:hidden; }
+.daw-lane { overflow:hidden;background-image:none; }
+.daw-ruler-line { overflow:hidden;flex-shrink:0; }
+.daw-grid-line { position:absolute;top:0;bottom:0;width:1px;background:#343b3466;pointer-events:none; }
+.daw-grid-line.bar { background:#58634e88; }
+.daw-warp-line { position:absolute;top:28px;bottom:0;width:1px;background:var(--amber2);pointer-events:none; }
+.daw-warp-editor { margin-top:12px;padding:16px; }
+.daw-warp-editor p { font-size:12px;color:var(--muted);margin-bottom:12px; }
+.daw-marker-row { display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin:10px 0; }
+.daw-marker-row>span { width:70px;font-size:12px; }.daw-marker-row input { width:130px; }
