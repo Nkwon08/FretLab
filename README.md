@@ -23,18 +23,19 @@
 
 ![Tuner](docs/tuner.png)
 
-### 🔁 Jam Mode
-- Record loops with your microphone over a click track, with a one-bar count-in
-- **Automatic quantization** — recordings are trimmed to the beat grid and crossfaded for seamless looping
-- Waveform editor with draggable trim handles, playback indicator, and undo
-- Pick a key and chord progression (I–V–vi–IV, ii–V–I, and more) to jam over
-- Save loops to your browser (IndexedDB) and reload them anytime
-
-![Jam Mode](docs/jam-mode.png)
+### 🔁 Jam Mode — Mini DAW
+- Opens directly into a multitrack recording timeline, starting with one guitar layer
+- Select an audio interface/input channel and output device in **Audio settings** (output selection depends on browser support)
+- Record dry mono guitar while existing tracks play, then add more recording layers
+- Move waveform clips, trim either edge, split at the playhead, delete clips, and undo edits
+- Cursor-anchored timeline zoom, per-track height zoom, beat snapping, mute/level controls, and loop playback
+- Beat-locked **Repitch warping** with editable sample-to-beat markers; natural-rate audio when Warp is off
+- Save/restore a session in this browser, import audio or old saved loops, and export a stereo WAV mix
+- See [studio usage and limitations](docs/jam-mode.md)
 
 ## Getting Started
 
-FretLab is a single self-contained HTML file.
+FretLab is a static app with no build step. Serve the repository root, including the `assets/` folder.
 
 ```bash
 git clone https://github.com/Nkwon08/FretLab.git
@@ -58,8 +59,9 @@ It's a static site — host it anywhere:
 
 ```
 FretLab/
-├── index.html          # The entire application (React via CDN)
+├── index.html          # App shell and practice tools (React via CDN)
 ├── assets/
+│   ├── js/             # Mini DAW, audio engine, and capture worklet
 │   └── samples/
 │       └── standard/   # Open-string audio samples for the tuner
 ├── docs/               # README screenshots
@@ -71,10 +73,10 @@ FretLab/
 - **React 18** (production build via CDN) with in-browser JSX via Babel Standalone
 - **Tailwind CSS** (Play CDN) for styling
 - **Web Audio API** — metronome, pitch detection, loop quantization, and synthesized string plucks
-- **MediaRecorder API** — loop recording
+- **AudioWorklet** — PCM recording on the playback sample clock
 - **IndexedDB** — persistent loop storage
 
-No bundler, no dependencies to install — the whole app ships as one HTML file.
+No bundler, no dependencies to install — serve the HTML and assets together.
 
 ## Browser Support
 
