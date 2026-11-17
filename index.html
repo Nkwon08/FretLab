@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FretLab — Guitar Scale & Chord Explorer</title>
-    <meta name="description" content="FretLab is an interactive guitar practice studio: explore scales and diatonic chords on a full 21-fret fretboard, tune up with the built-in chromatic tuner, and record quantized loops in Jam Mode." />
+    <meta name="description" content="FretLab is an interactive guitar practice studio: explore scales and diatonic chords on a full 21-fret fretboard, tune up with the built-in chromatic tuner, and record layered guitar tracks in Jam Mode." />
     <meta name="theme-color" content="#171918" />
     <meta property="og:title" content="FretLab — Guitar Scale & Chord Explorer" />
     <meta property="og:description" content="Explore scales and chords on an interactive fretboard, tune your guitar, and record practice loops — all in the browser." />
@@ -14,6 +14,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="assets/js/jam-studio.css" />
     <style>
       :root {
         color-scheme: dark;
@@ -221,6 +222,9 @@
     <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
 
+    <script src="assets/js/jam-core.js"></script>
+    <script src="assets/js/jam-view.js"></script>
+    <script type="text/babel" data-presets="env,react" src="assets/js/jam-studio.jsx"></script>
     <script type="text/babel" data-presets="env,react">
       const { useState, useMemo } = React;
 
@@ -2276,7 +2280,7 @@
                       {[
                         { number: '01', title: 'Explore the fretboard', page: 'FretBoard', text: 'Scales, chord tones, and your own saved patterns.' },
                         { number: '02', title: 'Tune your guitar', page: 'Tuner', text: 'Live pitch detection and open-string reference tones.' },
-                        { number: '03', title: 'Build a loop', page: 'Jam Mode', text: 'Set a tempo, record an idea, and play it back.' },
+                        { number: '03', title: 'Record an idea', page: 'Jam Mode', text: 'Open your studio, record a take, and build layers.' },
                       ].map(tool => <button key={tool.page} onClick={() => setPage(tool.page)} className="tool-row">
                         <span className="tool-number">{tool.number}</span><span><span className="tool-title">{tool.title}</span><span className="tool-copy block">{tool.text}</span></span><span className="tool-arrow" aria-hidden="true">↗</span>
                       </button>)}
@@ -2705,170 +2709,14 @@
               )}
 
               {/* ---------------- Jam Mode ---------------- */}
-              {page === 'Jam Mode' && (
-                <div className="page">
-                  <div className="page-heading"><div><h1>Jam Mode</h1><p className="page-description">Record a phrase, shape the loop, and keep playing.</p></div><span className="fl-label">4/4 time</span></div>
-
-                  {isCountdownActive && countdown !== null && (
-                    <div className="fixed inset-0 z-40 pointer-events-none flex items-center justify-center">
-                      <div role="status" className="text-[8rem] md:text-[10rem] font-semibold text-[#e0c48e] bg-[#171918]/95 px-10 rounded-md">
-                        {countdown}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="jam-settings">
-                    <section>
-                      <div className="fl-label mb-2">Key</div>
-                      <select
-                        aria-label="Key" value={selectedKey}
-                        onChange={(e) => setSelectedKey(e.target.value)}
-                        className="fl-input w-full h-10 px-3 text-sm"
-                        disabled={isRecording || isCountdownActive}
-                      >
-                        {noteNames.map((key) => <option key={key} value={key}>{key}</option>)}
-                      </select>
-                      <div className="fl-label mt-5 mb-2">Chord progression</div>
-                      <select
-                        aria-label="Chord progression" value={selectedProgression ?? ''}
-                        onChange={(e) => setSelectedProgression(e.target.value === '' ? null : parseInt(e.target.value))}
-                        className="fl-input w-full h-10 px-3 text-sm"
-                      >
-                        <option value="">None</option>
-                        {chordProgressions.map((prog, idx) => <option key={idx} value={idx}>{prog.name}</option>)}
-                      </select>
-                      {selectedProgression !== null && chordProgressions[selectedProgression].romans.length > 0 && (
-                        <div className="mt-3.5 flex flex-wrap gap-2">
-                          {chordsForProgression(selectedKey, chordProgressions[selectedProgression].romans).map((chord, idx) => (
-                            <div key={idx} className="fl-card px-3.5 py-1.5 font-bold text-[#eceee8] text-sm">
-                              {chord}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </section>
-
-                    <section>
-                      <div className="fl-label mb-3">Click track</div>
-                      <div className="flex flex-wrap items-center gap-4 mb-4">
-                        <Knob value={bpm} min={20} max={300} />
-                        <input
-                          aria-label="Tempo in BPM" type="number" min={20} max={300} value={bpm}
-                          onChange={(e) => {
-                            const v = Math.max(20, Math.min(300, Number(e.target.value) || 0));
-                            setBpm(v);
-                          }}
-                          className="fl-input h-10 w-24 px-3 text-sm text-center font-semibold"
-                        />
-                        <div className="fl-switch h-9 items-center">
-                          <button className={`px-4 h-full text-xs ${isMetronomeEnabled ? 'on' : ''}`} aria-pressed={isMetronomeEnabled} onClick={() => setIsMetronomeEnabled(true)}>On</button>
-                          <button className={`px-4 h-full text-xs ${!isMetronomeEnabled ? 'on' : ''}`} aria-pressed={!isMetronomeEnabled} onClick={() => setIsMetronomeEnabled(false)}>Off</button>
-                        </div>
-                      </div>
-                      <div className="text-sm text-[#b1b9af]">1 bar count-in at {bpm} BPM{isMetronomeEnabled ? ', click while recording' : ''}.</div>
-                    </section>
-                  </div>
-
-                  <div className="mt-4 w-full max-w-2xl mx-auto text-center h-5">
-                    {isLoopProcessing && (
-                      <div className="text-sm font-bold text-[#e0c48e]">Quantizing…</div>
-                    )}
-                    {!isLoopProcessing && loopQuantizeInfo && (
-                      <div className="text-sm text-[#b1b9af]">
-                        {loopQuantizeInfo.beats} beat{loopQuantizeInfo.beats === 1 ? '' : 's'} @ {loopQuantizeInfo.bpm} BPM
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="transport">
-                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4"><div className="fl-label">Transport</div><span className="text-xs text-[#b1b9af]" role="status">{isRecording ? 'Recording in progress' : isCountdownActive ? 'Get ready…' : recordedAudio ? `${audioDuration.toFixed(2)}s recorded` : 'Ready to record'}</span></div>
-                    <div className="transport-controls">
-                    <button
-                      onClick={() => (isRecording || isCountdownActive) ? stopRecording() : startRecording()}
-                      className={`h-12 px-8 rounded text-[15px] ${(isRecording || isCountdownActive) ? 'fl-btn-danger' : 'fl-btn-primary'}`}
-                      disabled={isCropping || isLoopProcessing}
-                    >
-                      {isCountdownActive ? '⏹ Cancel countdown' : isRecording ? '⏹ Stop recording' : '● Start recording'}
-                    </button>
-
-                    <div className="transport-secondary">
-                      <button
-                        onClick={() => isPlaying ? stopPlayback() : playRecordedAudio()}
-                        disabled={!recordedAudio}
-                        className={`h-10 px-5 rounded ${isPlaying ? 'fl-btn-danger' : 'fl-btn'}`}
-                      >
-                        {isPlaying ? '⏸ Stop' : '▶ Play'}
-                      </button>
-                      <button
-                        aria-pressed={isLooping} onClick={() => { const nl = !isLooping; setIsLooping(nl); jamModeRef.current.shouldLoop = nl; }}
-                        disabled={!recordedAudio}
-                        className={`h-10 px-5 rounded ${isLooping ? 'fl-btn-primary' : 'fl-btn'}`}
-                      >
-                        {isLooping ? 'Looping' : 'Loop'}
-                      </button>
-                      <button
-                        aria-expanded={showCropUI} onClick={() => setShowCropUI(!showCropUI)}
-                        disabled={!recordedAudio}
-                        className={`h-10 px-5 rounded ${showCropUI ? 'fl-btn-primary' : 'fl-btn'}`}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => saveLoopToDb()}
-                        disabled={!recordedAudio}
-                        className="fl-btn h-10 px-5 rounded"
-                      >
-                        Save loop
-                      </button>
-                    </div>
-                  </div>
-
-                  {!recordedAudio && <p className="empty-state">Your loop will appear here. Recording starts after a one-bar count-in.</p>}
-                  </div>
-                  {showCropUI && recordedAudio && (
-                    <div className="fl-panel p-5 mt-6 w-full">
-                      <div className="font-semibold text-[#eceee8] mb-1">Trim loop</div>
-                      <div className="text-xs mb-3 text-[#929e92]">Drag the handles to trim, drag the middle to move the selection.</div>
-
-                      <div className="rounded p-3 bg-[#191c19] border border-[#343a35]">
-                        <canvas id="waveform-canvas" width="800" height="140" className="w-full h-[140px] rounded bg-transparent cursor-pointer select-none touch-none" />
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-3 mt-4">
-                        <button onClick={cropAudio} disabled={isCropping || isRecording} className="fl-btn-primary h-10 px-5 text-sm">
-                          {isCropping ? 'Trimming…' : 'Apply trim'}
-                        </button>
-                        <button onClick={undoTrim} disabled={undoStack.length === 0 || isCropping || isRecording} className="fl-btn h-10 px-5 text-sm">
-                          ↺ Undo
-                        </button>
-                        <div className="text-sm text-[#b1b9af] ml-auto">Duration: {audioDuration.toFixed(2)}s</div>
-                      </div>
-                    </div>
-                  )}
-
-                  {savedLoops && savedLoops.length > 0 && (
-                    <div className="mt-8">
-                      <div className="font-semibold text-[#eceee8] mb-3">Saved loops</div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {savedLoops.map(loop => (
-                          <div key={loop.id} className="fl-card p-3.5 flex flex-wrap items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="font-bold text-sm text-[#eceee8] truncate">{loop.name || 'Untitled loop'}</div>
-                              <div className="text-xs text-[#b1b9af] mt-0.5">
-                                {loop.progressionName ? `${loop.progressionName} • ` : ''}Key {loop.key} • {loop.bpm} BPM
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <button onClick={() => loadLoop(loop.id)} className="fl-btn h-9 px-3.5 text-[13px]">Load</button>
-                              <button onClick={() => deleteLoop(loop.id)} className="fl-btn-danger h-9 px-3.5 text-[13px]">Delete</button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              <JamStudio active={page === 'Jam Mode'} legacyLoops={savedLoops} loadLegacy={async (id) => {
+                const db = await openDb();
+                return new Promise((resolve, reject) => {
+                  const req = db.transaction('loops', 'readonly').objectStore('loops').get(id);
+                  req.onsuccess = () => { db.close(); resolve(req.result.blob); };
+                  req.onerror = () => { db.close(); reject(req.error); };
+                });
+              }} />
 
               {/* ---------------- About ---------------- */}
               {page === 'About' && (
@@ -2878,7 +2726,7 @@
                     <p>
                       FretLab is a free, browser-based practice studio for guitarists. Visualize any scale or
                       diatonic chord across the full neck, tune up with the chromatic tuner, and record
-                      quantized practice loops in Jam Mode — no installs, no accounts.
+                      layered guitar tracks in Jam Mode — no installs, no accounts.
                     </p>
                     <p className="text-[#eceee8] font-semibold">Built by Nathan Kwon.</p>
                   </div>
